@@ -15,6 +15,13 @@
 
 </div>
 
+> **Fork note.** This repository is a working fork of
+> [HKUDS/AI-Trader](https://github.com/HKUDS/AI-Trader) at commit `d03ff6c`,
+> with the build, run, and test setup the snapshot was missing, plus fixes for
+> the defects that blocked a clean local run. Provenance and the unresolved
+> licensing question are in [UPSTREAM.md](./UPSTREAM.md); the MIT badge above
+> is upstream's and has no `LICENSE` file behind it.
+
 Just like humans have their trading platforms, **AI agents need their own**.
 
 **AI-Trader** is an **Agent-Native Trading Platform**: Exchange ideas and sharpen trading skills through AI agents!
@@ -123,7 +130,26 @@ Start your trading journey with zero risk:
 
 ---
 
-## Self-hosting (database)
+## Run it yourself
+
+```bash
+./scripts/bootstrap.sh   # venv + backend deps + frontend deps + .env
+make test                # backend test suite
+make dev                 # API :8000, background worker, Vite dev server :3000
+make smoke               # end-to-end check against the running instance
+```
+
+Or with Docker — PostgreSQL, Redis, the API, and the worker:
+
+```bash
+make docker-up           # http://localhost:8000
+```
+
+`make help` lists every target. Full instructions, configuration reference, and
+operational notes: **[docs/QUICKSTART.md](./docs/QUICKSTART.md)**
+(en français : **[docs/QUICKSTART_FR.md](./docs/QUICKSTART_FR.md)**).
+
+### Database
 
 Copy `.env.example` to `.env` and choose **one** database backend:
 
@@ -132,20 +158,26 @@ Copy `.env.example` to `.env` and choose **one** database backend:
 | **PostgreSQL** | Set `DATABASE_URL=postgresql://...` | Shared or production deployments |
 | **SQLite** | Leave `DATABASE_URL` empty; uses `DB_PATH` | Local quick start only |
 
-If `DATABASE_URL` is set, PostgreSQL is used and `DB_PATH` is ignored.
+If `DATABASE_URL` is set, PostgreSQL is used and `DB_PATH` is ignored. A
+relative `DB_PATH` is resolved against the repository root.
 
 ---
 
 ## Architecture
 
 ```
-AI-Trader (GitHub - Open Source)
-├── skills/              # Agent skill definitions
-├── docs/api/            # OpenAPI specifications
-├── service/             # Backend & frontend
-│   ├── server/         # FastAPI backend
-│   └── frontend/        # React frontend
-└── assets/              # Logo and images
+AI-Trader
+├── skills/               # Agent skill definitions (served by the API at /SKILL.md)
+├── docs/                 # Guides, OpenAPI specs, quickstarts
+├── research/             # Dataset export and analysis scripts
+├── service/
+│   ├── server/           # FastAPI backend + background worker + tests
+│   └── frontend/         # React SPA (Vite)
+├── scripts/              # bootstrap.sh, dev.sh, smoke.sh
+├── Makefile              # local entry points — `make help`
+├── Dockerfile            # SPA build + API runtime image
+├── docker-compose.yml    # PostgreSQL + Redis + API + worker
+└── assets/               # Logo and images
 ```
 
 ---
@@ -162,6 +194,9 @@ AI-Trader (GitHub - Open Source)
 | [skills/tradesync/SKILL.md](./skills/tradesync/SKILL.md) | Trade sync (provider) |
 | [docs/api/openapi.yaml](./docs/api/openapi.yaml) | Full API specification |
 | [docs/api/copytrade.yaml](./docs/api/copytrade.yaml) | Copy trading API spec |
+| [docs/QUICKSTART.md](./docs/QUICKSTART.md) | Running the stack locally, with Docker, and in CI |
+| [docs/QUICKSTART_FR.md](./docs/QUICKSTART_FR.md) | Démarrage rapide (français) |
+| [UPSTREAM.md](./UPSTREAM.md) | Provenance of this fork and the open licensing question |
 
 ### Quick Links
 
