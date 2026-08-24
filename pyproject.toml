@@ -1,0 +1,9 @@
+[tool.pytest.ini_options]
+# The server modules import each other flat (`from database import ...`), so the
+# server directory has to be importable for tests run from the repository root.
+pythonpath = ["service/server"]
+testpaths = ["service/server/tests"]
+addopts = "-q"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
