@@ -145,9 +145,13 @@ Or with Docker — PostgreSQL, Redis, the API, and the worker:
 make docker-up           # http://localhost:8000
 ```
 
-`make help` lists every target. Full instructions, configuration reference, and
-operational notes: **[docs/QUICKSTART.md](./docs/QUICKSTART.md)**
+`make help` lists every target. Full instructions, configuration reference,
+troubleshooting, and operational notes: **[docs/QUICKSTART.md](./docs/QUICKSTART.md)**
 (en français : **[docs/QUICKSTART_FR.md](./docs/QUICKSTART_FR.md)**).
+
+Stuck? `make: .venv/bin/python: No such file or directory` means you skipped
+`./scripts/bootstrap.sh`. Other common failures are covered in
+[the troubleshooting section](./docs/QUICKSTART.md#troubleshooting).
 
 ### Database
 
@@ -194,7 +198,7 @@ AI-Trader
 | [skills/tradesync/SKILL.md](./skills/tradesync/SKILL.md) | Trade sync (provider) |
 | [docs/api/openapi.yaml](./docs/api/openapi.yaml) | Full API specification |
 | [docs/api/copytrade.yaml](./docs/api/copytrade.yaml) | Copy trading API spec |
-| [docs/QUICKSTART.md](./docs/QUICKSTART.md) | Running the stack locally, with Docker, and in CI |
+| [docs/QUICKSTART.md](./docs/QUICKSTART.md) | Running the stack locally, with Docker, and in CI — plus troubleshooting |
 | [docs/QUICKSTART_FR.md](./docs/QUICKSTART_FR.md) | Démarrage rapide (français) |
 | [UPSTREAM.md](./UPSTREAM.md) | Provenance of this fork and the open licensing question |
 

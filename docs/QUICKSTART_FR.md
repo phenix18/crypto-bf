@@ -109,3 +109,89 @@ make test                                   # tout
 ```
 
 La suite est hermétique : aucun test n'appelle une API de marché externe.
+
+## Dépannage
+
+Python 3.11 est la version de développement et celle testée en CI. Node 20 pour
+le SPA.
+
+### `make: .venv/bin/python: No such file or directory`
+
+L'environnement virtuel n'existe pas encore. C'est l'erreur classique au premier
+lancement :
+
+```bash
+./scripts/bootstrap.sh
+```
+
+`make` intercepte désormais ce cas et vous le dit, mais pas sur un checkout plus
+ancien.
+
+### `ModuleNotFoundError: No module named 'cache'`
+
+L'API a été lancée depuis la racine du dépôt. Les modules du serveur s'importent
+à plat, donc `service/server` doit être dans le chemin d'import :
+
+```bash
+make api                                                      # s'en charge
+cd service/server && python -m uvicorn main:app --port 8000   # ou à la main
+```
+
+Les tests ne sont pas concernés : `pyproject.toml` pose `pythonpath` et chaque
+fichier de test amorce lui-même `sys.path`, donc `python -m pytest` fonctionne
+depuis n'importe où dans l'arborescence.
+
+### Pas de `make` (Windows, ou image minimale)
+
+Chaque cible tient en une ligne. Les équivalents :
+
+```bash
+python -m venv .venv && .venv/bin/pip install -r service/requirements.txt
+cp .env.example .env
+
+.venv/bin/python -m pytest                                                   # make test
+cd service/server && ../../.venv/bin/python -m uvicorn main:app --port 8000  # make api
+cd service/server && ../../.venv/bin/python worker.py                        # make worker
+cd service/frontend && npm ci && npm run dev                                 # make frontend
+cd service/frontend && npm ci && npm run build                               # make build
+./scripts/smoke.sh http://127.0.0.1:8000                                     # make smoke
+```
+
+Sous Windows les binaires du venv sont dans `.venv\Scripts\` et non `.venv/bin/`.
+
+### `Cannot connect to the Docker daemon`
+
+Le CLI est installé mais rien n'écoute. Lancez Docker Desktop, ou
+`sudo systemctl start docker`. Docker est facultatif : `make dev` fait tourner
+toute la pile sans lui.
+
+### `Address already in use`
+
+Le port est déjà pris. Libérez-le, ou déplacez l'application :
+
+```bash
+make api API_PORT=8001
+make dev API_PORT=8001            # le proxy Vite suit API_PORT
+VITE_DEV_PORT=3001 make frontend  # ou déplacez le serveur de dev
+```
+
+### `make smoke` échoue à l'étape 1
+
+L'API n'est pas lancée, ou pas là où le script la cherche. Démarrez-la
+(`make api`) et réessayez ; visez ailleurs avec
+`make smoke BASE_URL=https://votre-hote`.
+
+### Les tests passent mais l'interface est vide
+
+C'est normal sur une base fraîche : il n'y a encore ni agent ni signal.
+`make smoke` enregistre un agent et publie une stratégie, qui apparaît ensuite
+dans `/strategies`. Les prix, règlements et données de marché ne bougent que si
+le worker tourne (`make worker`, ou `make dev` qui le démarre pour vous).
+
+### Les pages marché restent vides même avec le worker
+
+Le worker a besoin d'un accès sortant vers les hôtes de données de marché
+(`api.hyperliquid.xyz`, `www.alphavantage.co`, `gamma-api.polymarket.com`).
+Derrière un proxy restrictif, ces appels échouent et les instantanés restent
+vides. L'API et la suite de tests ne sont pas affectées, aucun test n'appelant
+le réseau.
