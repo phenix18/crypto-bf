@@ -9,7 +9,7 @@ BASE_URL ?= http://127.0.0.1:$(API_PORT)
 
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap install test api worker frontend build dev smoke clean \
-        docker-up docker-down docker-logs require-venv require-npm require-docker
+        docker-up docker-down docker-logs require-venv require-npm require-npm-binary require-docker
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -28,7 +28,7 @@ require-venv:
 		exit 1; \
 	}
 
-require-npm:
+require-npm-binary:
 	@command -v npm >/dev/null 2>&1 || { \
 		echo ""; \
 		echo "  npm is not installed, and this target needs it to build the SPA."; \
@@ -37,6 +37,8 @@ require-npm:
 		echo ""; \
 		exit 1; \
 	}
+
+require-npm: require-npm-binary
 	@test -d service/frontend/node_modules || { \
 		echo ""; \
 		echo "  Frontend dependencies are not installed."; \
@@ -83,7 +85,7 @@ worker: require-venv ## Start the background worker (prices, settlements, market
 frontend: require-npm ## Start the Vite dev server (http://127.0.0.1:3000)
 	cd service/frontend && VITE_API_PROXY_TARGET=http://127.0.0.1:$(API_PORT) npm run dev
 
-build: ## Build the frontend into service/frontend/dist (served by the API at /)
+build: require-npm-binary ## Build the frontend into service/frontend/dist (served by the API at /)
 	cd service/frontend && npm ci && npm run build
 
 dev: require-venv ## Run API + worker + frontend together

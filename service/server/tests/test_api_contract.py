@@ -121,3 +121,36 @@ class ApiContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LifespanTests(unittest.TestCase):
+    """The API entry point owns startup/shutdown through a lifespan handler.
+
+    main.py's lifespan is not reachable from here without importing the module
+    (which writes logs and touches the configured database), so these cover the
+    contract create_app offers it: the handler runs on enter and on exit, and
+    create_app without one still builds a working app.
+    """
+
+    def test_create_app_runs_the_lifespan(self) -> None:
+        from contextlib import asynccontextmanager
+
+        events = []
+
+        @asynccontextmanager
+        async def lifespan(app):
+            events.append("startup")
+            try:
+                yield
+            finally:
+                events.append("shutdown")
+
+        with TestClient(create_app(lifespan=lifespan)) as client:
+            self.assertEqual(events, ["startup"])
+            self.assertEqual(client.get("/api/health").status_code, 200)
+
+        self.assertEqual(events, ["startup", "shutdown"])
+
+    def test_create_app_without_lifespan_still_serves(self) -> None:
+        with TestClient(create_app()) as client:
+            self.assertEqual(client.get("/api/health").status_code, 200)
