@@ -11,10 +11,12 @@ AI-Trader Backend Server
 - main.py     : 应用入口
 """
 
+import asyncio
 import secrets
 import logging
 import os
 import sys
+from contextlib import asynccontextmanager, suppress
 from logging.handlers import RotatingFileHandler
 
 # Setup logging
@@ -55,15 +57,17 @@ if not api_access_log_enabled():
 # Initialize database
 init_database()
 
-# Create app
-app = create_app()
 
+# ==================== Lifespan ====================
 
-# ==================== Startup ====================
+@asynccontextmanager
+async def lifespan(app):
+    """Own the API process lifecycle: warm the cache, run background tasks.
 
-@app.on_event("startup")
-async def startup_event():
-    """Startup event - schedule background tasks."""
+    Background tasks started here are cancelled on shutdown, so a reload or a
+    SIGTERM does not leave price-fetch and settlement loops running against a
+    half-torn-down process.
+    """
     db_status = get_database_status()
     logger.info(
         "Database ready: backend=%s details=%s",
@@ -83,15 +87,30 @@ async def startup_event():
     # Initialize trending cache
     logger.info("Initializing trending cache...")
     _update_trending_cache()
-    if not background_tasks_enabled_for_api():
+
+    started = []
+    if background_tasks_enabled_for_api():
+        started = start_background_tasks(logger)
+        logger.info("Background tasks started: %s", len(started))
+    else:
         logger.info(
             "API background tasks disabled. Run `python service/server/worker.py` "
             "to process prices, profit history, settlements, and market intel."
         )
-        return
 
-    started = start_background_tasks(logger)
-    logger.info("Background tasks started: %s", len(started))
+    try:
+        yield
+    finally:
+        for task in started:
+            task.cancel()
+        if started:
+            with suppress(Exception):
+                await asyncio.gather(*started, return_exceptions=True)
+            logger.info("Background tasks stopped: %s", len(started))
+
+
+# Create app
+app = create_app(lifespan=lifespan)
 
 
 # ==================== Run ====================

@@ -3,6 +3,24 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, EmailStr, field_validator
 
 
+def _normalize_csv_field(value):
+    """Accept a list/tuple of tokens or a comma-separated string.
+
+    Signals persist ``symbols``/``tags`` as comma-separated strings but read
+    them back as lists, and the agent skill documentation shows JSON arrays.
+    Normalizing here lets both shapes be posted.
+    """
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple, set)):
+        tokens = [str(item).strip() for item in value]
+    else:
+        tokens = [token.strip() for token in str(value).split(",")]
+    tokens = [token for token in tokens if token]
+    return ",".join(tokens) or None
+
+
+
 class AgentLogin(BaseModel):
     name: str
     password: str
@@ -72,6 +90,11 @@ class StrategyRequest(BaseModel):
     mission_key: Optional[str] = None
     team_key: Optional[str] = None
 
+    @field_validator("symbols", "tags", mode="before")
+    @classmethod
+    def normalize_csv_fields(cls, value):
+        return _normalize_csv_field(value)
+
 
 class DiscussionRequest(BaseModel):
     market: str
@@ -82,6 +105,11 @@ class DiscussionRequest(BaseModel):
     challenge_key: Optional[str] = None
     mission_key: Optional[str] = None
     team_key: Optional[str] = None
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def normalize_csv_fields(cls, value):
+        return _normalize_csv_field(value)
 
 
 class ChallengeCreateRequest(BaseModel):

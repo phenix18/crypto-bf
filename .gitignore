@@ -133,3 +133,15 @@ change.md
 
 # Local agent config symlink
 .codex
+
+# ====================
+# Local development
+# ====================
+.venv/
+/service/frontend/dist/
+/service/server/logs/
+
+# SQLite files, wherever DB_PATH happens to put them.
+*.db
+*.db-wal
+*.db-shm

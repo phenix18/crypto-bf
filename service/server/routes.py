@@ -5,6 +5,7 @@ Routes Module
 """
 
 import time
+from typing import Any, Callable, Optional
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,8 +24,15 @@ from routes_trading import register_trading_routes
 from routes_users import register_user_routes
 
 
-def create_app() -> FastAPI:
-    app = FastAPI(title='AI-Trader API')
+def create_app(lifespan: Optional[Callable[[FastAPI], Any]] = None) -> FastAPI:
+    """Build the ASGI app.
+
+    ``lifespan`` is the async context manager that owns process-wide startup and
+    shutdown (background tasks, cache warming). The API entry point in main.py
+    supplies one; tests call ``create_app()`` without it so they get the routes
+    without the side effects.
+    """
+    app = FastAPI(title='AI-Trader API', lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,

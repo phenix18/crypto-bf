@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+venv
+node_modules
+service/frontend/node_modules
+service/frontend/dist
+service/server/data
+service/server/logs
+research
+**/__pycache__
+*.pyc
+.pytest_cache
+.env
+*.db
+*.db-wal
+*.db-shm
