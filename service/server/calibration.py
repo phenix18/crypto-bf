@@ -144,12 +144,32 @@ class CalibrationConfig:
     # Decided trades (wins + losses) needed before a bucket's rate is used.
     min_sample: int = 30
     # Confident hit rate a bucket must clear once it has a usable sample.
+    #
+    # Not 0.90. At the 1.3-to-2.5 reward-to-risk this engine demands, a 90% hit
+    # rate would be an edge no fund in liquid crypto has; asking for it would
+    # close the gate permanently. What actually makes money is this floor
+    # together with the expectancy floor below — 55% at 2R is a very good
+    # strategy, and the Wilson bound means even that has to be earned.
     min_hit_rate: float = 0.55
     # Expectancy floor in R. A high hit rate with negative expectancy is a
     # losing strategy wearing a good-looking number.
     min_expectancy_r: float = 0.0
     # Confluence a proposal must clear while the bucket is still learning.
-    confluence_gate: float = 90.0
+    #
+    # Why 65 and not 90: confluence is agreement among the checks that have a
+    # reading, measured over several hundred synthetic series before this
+    # number was chosen. A textbook trend scores about 69; the 90th percentile
+    # of actionable setups is about 74; nothing reached 90 at all. A gate of 90
+    # is therefore not "only the best setups", it is "no setups" — and the
+    # second-order cost is worse than the missed trades: a bot that never
+    # trades never fills a bucket, never reaches min_sample, and so never gets
+    # to the calibrated phase where a real probability can be measured. The
+    # gate has to admit the setups this engine itself calls clean.
+    #
+    # The 90% worth wanting is a *win rate*, a different quantity entirely,
+    # and it lives below in min_hit_rate — where it would also be a fantasy at
+    # a 1.3+ reward-to-risk: see the note there.
+    confluence_gate: float = 65.0
 
 
 def summarise(records: Sequence[TradeRecord], bucket: Bucket) -> BucketStats:

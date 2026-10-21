@@ -140,6 +140,9 @@ class Proposal:
     votes: list[Vote]
     readings: Readings
     blockers: list[str] = field(default_factory=list)
+    # Share of the checks' weight that had a reading at all. Confluence is
+    # agreement among those; this says how many of them there were.
+    participation: float = 0.0
 
     @property
     def actionable(self) -> bool:
@@ -158,6 +161,7 @@ class Proposal:
             "direction": self.direction.value,
             "regime": self.regime.value,
             "confluence": round(self.confluence, 2),
+            "participation": round(self.participation * 100, 2),
             "entry": self.entry,
             "stop_loss": self.stop_loss,
             "take_profit": self.take_profit,
@@ -205,6 +209,9 @@ class StrategyConfig:
     min_atr_percent: float = 0.05   # below this the move cannot pay the fees
     max_atr_percent: float = 5.0    # above this the stop is a coin flip
     min_candles: int = 60
+    # How much of the checks' weight must have a reading before the agreement
+    # among them means anything. Two checks agreeing is not a confluence.
+    min_participation: float = 0.45
 
     # How close to structure counts as "at the level", as a fraction of price.
     structure_proximity: float = 0.004
@@ -587,12 +594,26 @@ def analyse(
     votes = apply_regime_weights(votes, regime)
 
     total_weight = sum(v.weight for v in votes)
+    voted_weight = sum(v.weight for v in votes if v.direction is not Direction.FLAT)
     net = sum(v.signed for v in votes)
-    # Confluence is how much of the *available* weight pulls the same way.
-    confluence = abs(net) / total_weight * 100.0 if total_weight else 0.0
+    # Confluence is agreement among the checks that actually have a reading.
+    #
+    # It used to divide by the whole board, which sounded stricter and was in
+    # fact unreachable: in a trend the mean-reversion family is structurally
+    # quiet, so a textbook setup topped out near 50 and a "only trade above 90"
+    # rule meant "never trade". Silence is still not free — it shows up as
+    # participation, which is policed as a blocker just below — but it no
+    # longer makes the headline number uninterpretable.
+    confluence = abs(net) / voted_weight * 100.0 if voted_weight else 0.0
+    participation = voted_weight / total_weight if total_weight else 0.0
     direction = Direction.LONG if net > 0 else Direction.SHORT if net < 0 else Direction.FLAT
 
     blockers: list[str] = []
+    if participation < config.min_participation:
+        blockers.append(
+            f"only {participation * 100:.0f}% of the checks have a reading, "
+            f"need {config.min_participation * 100:.0f}%"
+        )
     if regime.direction is not Direction.FLAT and direction is regime.direction.opposite:
         # The checks net out against the prevailing trend. That is a fade, and
         # fading a trend is exactly the trade this engine refuses to take.
@@ -631,6 +652,7 @@ def analyse(
         votes=votes,
         readings=readings,
         blockers=blockers,
+        participation=participation,
     )
 
 

@@ -329,3 +329,58 @@ class FamilyWeightTests(unittest.TestCase):
             result = analyse("BTCUSDT", "5m", build(prices))
             for vote in result.votes:
                 self.assertGreater(vote.weight, 0.0)
+
+
+class ConfluenceScaleTests(unittest.TestCase):
+    """What the headline number means, and that it is reachable.
+
+    The scale was wrong once in a way nothing caught: dividing agreement by
+    every check on the board, including the ones that structurally have nothing
+    to say in the current regime, capped a textbook setup near 50. Nothing was
+    broken, no test failed, and a "trade above 90" rule quietly meant "never
+    trade" — the worst kind of bug, because the bot looks like it is working.
+    """
+
+    def test_a_clean_trend_clears_a_demanding_gate(self) -> None:
+        # This is the regression test for that bug. If the scale is ever
+        # redefined again, a textbook trend must still be able to clear the
+        # gate the trader actually ships with.
+        from calibration import CalibrationConfig
+
+        result = analyse("BTCUSDT", "5m", build(uptrend()))
+        self.assertTrue(result.actionable)
+        self.assertGreaterEqual(result.confluence, CalibrationConfig().confluence_gate)
+
+    def test_participation_is_reported_alongside_the_score(self) -> None:
+        result = analyse("BTCUSDT", "5m", build(uptrend()))
+        self.assertGreater(result.participation, 0.0)
+        self.assertLessEqual(result.participation, 1.0)
+        self.assertEqual(
+            result.to_dict()["participation"], round(result.participation * 100, 2)
+        )
+
+    def test_confluence_is_agreement_among_the_checks_that_spoke(self) -> None:
+        result = analyse("BTCUSDT", "5m", build(uptrend()))
+        voted = [v for v in result.votes if v.direction is not Direction.FLAT]
+        voted_weight = sum(v.weight for v in voted)
+        net = sum(v.signed for v in voted)
+        self.assertAlmostEqual(result.confluence, abs(net) / voted_weight * 100.0, places=6)
+
+    def test_a_quiet_board_is_blocked_however_much_it_agrees(self) -> None:
+        # Two checks agreeing is not a confluence. Chop leaves most of the
+        # trend family silent, so participation, not the score, is what refuses
+        # it.
+        result = analyse("BTCUSDT", "5m", build(chop()))
+        self.assertLess(result.participation, 0.45)
+        self.assertTrue(any("have a reading" in b for b in result.blockers))
+
+    def test_the_participation_floor_is_configurable(self) -> None:
+        permissive = analyse(
+            "BTCUSDT", "5m", build(chop()), StrategyConfig(min_participation=0.0)
+        )
+        self.assertFalse(any("have a reading" in b for b in permissive.blockers))
+
+    def test_confluence_still_cannot_exceed_one_hundred(self) -> None:
+        for prices in (uptrend(), downtrend(), chop()):
+            result = analyse("BTCUSDT", "5m", build(prices))
+            self.assertLessEqual(result.confluence, 100.0)

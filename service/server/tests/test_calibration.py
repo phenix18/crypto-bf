@@ -135,17 +135,17 @@ class GateTests(unittest.TestCase):
         self.assertIsNone(verdict.probability)
 
     def test_a_cold_start_refuses_weak_confluence(self) -> None:
-        verdict = gate(confluence=70.0, regime="trending_up", direction="long", history=[])
+        verdict = gate(confluence=55.0, regime="trending_up", direction="long", history=[])
         self.assertEqual(verdict.basis, "confluence")
         self.assertFalse(verdict.allowed)
 
     def test_a_small_but_perfect_record_does_not_unlock_the_gate(self) -> None:
         # Five straight wins is not evidence; the gate stays on confluence.
         verdict = gate(
-            confluence=70.0,
+            confluence=55.0,
             regime="trending_up",
             direction="long",
-            history=history(5, 0, confluence=70.0),
+            history=history(5, 0, confluence=55.0),
         )
         self.assertEqual(verdict.basis, "confluence")
         self.assertFalse(verdict.allowed)
@@ -205,24 +205,34 @@ class GateTests(unittest.TestCase):
     def test_history_from_another_regime_does_not_count(self) -> None:
         # A long record in a trend says nothing about a long in a range.
         verdict = gate(
-            confluence=70.0,
+            confluence=55.0,
             regime="ranging",
             direction="long",
-            history=history(50, 5, regime="trending_up", confluence=70.0),
+            history=history(50, 5, regime="trending_up", confluence=55.0),
         )
         self.assertEqual(verdict.basis, "confluence")
         self.assertFalse(verdict.allowed)
 
     def test_the_confluence_gate_is_configurable(self) -> None:
-        relaxed = CalibrationConfig(confluence_gate=60.0)
-        verdict = gate(
-            confluence=70.0,
-            regime="trending_up",
-            direction="long",
-            history=[],
-            config=relaxed,
+        # Both directions: someone who wants fewer, stronger trades can raise
+        # it, and the default must not be the only workable value.
+        strict = CalibrationConfig(confluence_gate=90.0)
+        relaxed = CalibrationConfig(confluence_gate=50.0)
+        at_the_default = dict(
+            confluence=70.0, regime="trending_up", direction="long", history=[]
         )
-        self.assertTrue(verdict.allowed)
+        self.assertTrue(gate(**at_the_default).allowed)
+        self.assertFalse(gate(**at_the_default, config=strict).allowed)
+        self.assertTrue(
+            gate(confluence=55.0, regime="trending_up", direction="long", history=[],
+                 config=relaxed).allowed
+        )
+
+    def test_the_default_gate_admits_the_setups_the_engine_calls_clean(self) -> None:
+        # The gate and the engine have to agree on what "strong" means. A gate
+        # above everything the engine can score is a bot that never trades,
+        # never fills a bucket, and so never reaches the calibrated phase.
+        self.assertLessEqual(CalibrationConfig().confluence_gate, 75.0)
 
     def test_the_verdict_explains_itself(self) -> None:
         verdict = gate(

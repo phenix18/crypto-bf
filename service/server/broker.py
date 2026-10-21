@@ -197,6 +197,8 @@ class Broker(Protocol):
 
     def balance(self, asset: str) -> float: ...
 
+    def mark_price(self, symbol: str, price: float) -> None: ...
+
     def place_market_entry(
         self, *, symbol: str, side: Side, quantity: float, client_order_id: str
     ) -> OrderReceipt: ...
@@ -245,6 +247,10 @@ class PaperBroker:
 
     def balance(self, asset: str) -> float:
         return self.quote_balance
+
+    def mark_price(self, symbol: str, price: float) -> None:
+        """The caller tells paper what the market is doing; live asks the venue."""
+        self.prices[symbol.upper()] = price
 
     def _next_id(self) -> str:
         self._order_counter += 1
@@ -453,6 +459,9 @@ class BinanceSpotBroker:
         rules = InstrumentRules.from_exchange_info(symbols[0])
         self._rules_cache[symbol] = rules
         return rules
+
+    def mark_price(self, symbol: str, price: float) -> None:
+        """Nothing to do: the real book has its own opinion about the price."""
 
     def balance(self, asset: str = "USDT") -> float:
         payload = self._signed_request("GET", "/api/v3/account")
