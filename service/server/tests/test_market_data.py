@@ -25,6 +25,7 @@ from market_data import (  # noqa: E402
     CoinMarketCapQuotes,
     MarketDataError,
     ReplaySource,
+    SyntheticSource,
     build_source,
     parse_cmc_entry,
     validate,
@@ -157,6 +158,64 @@ class ReplaySourceTests(unittest.TestCase):
         source.add("BTCUSDT", "5m", original)
         original.append(candle(open_time=999))
         self.assertEqual(len(source.fetch("BTCUSDT", "5m", 50)), 5)
+
+
+# ------------------------------------------------------------------ synthetic --
+
+
+class SyntheticSourceTests(unittest.TestCase):
+    def source(self, now=1_700_000_000.0):
+        return SyntheticSource(clock=lambda: now)
+
+    def test_it_returns_the_asked_for_window(self):
+        self.assertEqual(len(self.source().fetch("BTCUSDT", "5m", 300)), 300)
+
+    def test_what_it_produces_passes_the_validator(self):
+        # The demo source has to obey the same rules as the exchange, or it
+        # hides bugs the real feed would expose.
+        candles = self.source().fetch("BTCUSDT", "5m", 400)
+        self.assertEqual(len(validate(candles, "BTCUSDT", "5m")), 400)
+
+    def test_the_same_symbol_always_prints_the_same_history(self):
+        first = self.source().fetch("BTCUSDT", "5m", 50)
+        second = self.source().fetch("BTCUSDT", "5m", 50)
+        self.assertEqual([c.close for c in first], [c.close for c in second])
+
+    def test_different_symbols_do_not_print_identical_charts(self):
+        btc = self.source().fetch("BTCUSDT", "5m", 50)
+        eth = self.source().fetch("ETHUSDT", "5m", 50)
+        self.assertNotEqual([c.close for c in btc], [c.close for c in eth])
+
+    def test_the_window_advances_with_the_clock(self):
+        early = self.source(1_700_000_000.0).fetch("BTCUSDT", "5m", 50)
+        later = self.source(1_700_000_000.0 + 300.0).fetch("BTCUSDT", "5m", 50)
+        self.assertNotEqual(early[-1].close, later[-1].close)
+
+    def test_the_newest_candle_is_the_current_bar(self):
+        # A chart drawn from this should show now, not 1970.
+        now = 1_700_000_000.0
+        candles = self.source(now).fetch("BTCUSDT", "5m", 50)
+        expected = (int(now * 1000 // 300_000) - 1) * 300_000
+        self.assertEqual(candles[-1].open_time, expected)
+
+    def test_candles_are_in_ascending_order(self):
+        candles = self.source().fetch("BTCUSDT", "15m", 100)
+        times = [c.open_time for c in candles]
+        self.assertEqual(times, sorted(times))
+        self.assertEqual(times[1] - times[0], 900_000)
+
+    def test_an_unknown_interval_raises(self):
+        with self.assertRaises(MarketDataError):
+            self.source().fetch("BTCUSDT", "7m", 50)
+
+    def test_a_limit_beyond_the_series_is_capped(self):
+        source = SyntheticSource(bars=200, clock=lambda: 1_700_000_000.0)
+        self.assertEqual(len(source.fetch("BTCUSDT", "5m", 10_000)), 200)
+
+    def test_it_says_what_it_is(self):
+        # The name travels with every response so a screen fed by this can say
+        # so instead of passing invented prices off as the market.
+        self.assertEqual(self.source().name, "synthetic")
 
 
 # ------------------------------------------------------------------ validation --
@@ -509,6 +568,10 @@ class BuildSourceTests(unittest.TestCase):
     def test_an_explicit_argument_beats_the_environment(self):
         with mock.patch.dict(os.environ, {"BINANCE_TESTNET": "true"}, clear=True):
             self.assertFalse(build_source(testnet=False).testnet)
+
+    def test_the_synthetic_provider_is_selectable(self):
+        with mock.patch.dict(os.environ, {"MARKET_DATA_PROVIDER": "synthetic"}, clear=True):
+            self.assertIsInstance(build_source(), SyntheticSource)
 
     def test_the_replay_provider_is_selectable(self):
         with mock.patch.dict(os.environ, {"MARKET_DATA_PROVIDER": "replay"}, clear=True):

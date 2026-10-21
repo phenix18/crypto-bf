@@ -49,6 +49,7 @@ from tasks import (
     background_tasks_enabled_for_api,
     start_background_tasks,
 )
+from tasks_autotrader import start_auto_trader
 
 if not api_access_log_enabled():
     logging.getLogger("uvicorn.access").disabled = True
@@ -97,6 +98,11 @@ async def lifespan(app):
             "API background tasks disabled. Run `python service/server/worker.py` "
             "to process prices, profit history, settlements, and market intel."
         )
+
+    # The auto-trader is separate from the other background work on purpose:
+    # it only exists when it has been armed, and it shuts down with everything
+    # else below rather than outliving the process that owns its position book.
+    started += start_auto_trader(logger)
 
     try:
         yield

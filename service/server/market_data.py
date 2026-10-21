@@ -13,15 +13,17 @@ original run.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
+import random
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
-from typing import Optional, Protocol, Sequence
+from typing import Callable, Optional, Protocol, Sequence
 
 from indicators import Candle
 
@@ -35,6 +37,15 @@ VALID_INTERVALS = {
 
 MAINNET_BASE = "https://api.binance.com"
 TESTNET_BASE = "https://testnet.binance.vision"
+
+# Milliseconds per interval, for sources that have to place candles in time
+# themselves rather than being told when they happened.
+INTERVAL_MS = {
+    "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000,
+    "1h": 3_600_000, "2h": 7_200_000, "4h": 14_400_000, "6h": 21_600_000,
+    "8h": 28_800_000, "12h": 43_200_000, "1d": 86_400_000, "3d": 259_200_000,
+    "1w": 604_800_000, "1M": 2_592_000_000,
+}
 
 
 class MarketDataError(RuntimeError):
@@ -95,6 +106,91 @@ class ReplaySource:
 
     def reset(self) -> None:
         self.cursor.clear()
+
+
+# --------------------------------------------------------------- synthetic --
+
+
+@dataclass
+class SyntheticSource:
+    """Plausible candles from a seed. For demonstrations, not for decisions.
+
+    There is one honest reason for this to exist: the interface, the pipeline
+    and the paper broker can all be shown working where there is no market
+    access at all. It is a source like any other, so nothing downstream needs
+    a special case — and because ``name`` travels with every response, a screen
+    fed by this can say so rather than passing invented prices off as the
+    market.
+
+    The series is a seeded random walk, so the same symbol always produces the
+    same history; the window advances with the clock, so a screen watching it
+    sees the market move.
+    """
+
+    seed: int = 7
+    bars: int = 2_000
+    drift: float = 0.00004
+    volatility: float = 0.0035
+    name: str = "synthetic"
+    _cache: dict[tuple[str, str], list[Candle]] = field(default_factory=dict)
+    clock: Callable[[], float] = time.time
+
+    def _series(self, symbol: str, interval: str) -> list[Candle]:
+        key = (symbol.upper(), interval)
+        if key in self._cache:
+            return self._cache[key]
+
+        step = INTERVAL_MS.get(interval, 300_000)
+        # A per-symbol seed, so BTC and ETH do not print identical charts.
+        rng = random.Random(f"{self.seed}:{key[0]}:{interval}")
+        price = 50.0 + (int(hashlib.sha256(key[0].encode()).hexdigest()[:8], 16) % 60_000) / 10.0
+        candles: list[Candle] = []
+        for index in range(self.bars):
+            drift = self.drift * math.sin(index / 180.0) * 6.0
+            close = max(0.01, price * (1 + drift + rng.gauss(0.0, self.volatility)))
+            high = max(price, close) * (1 + abs(rng.gauss(0.0, self.volatility / 2)))
+            low = min(price, close) * (1 - abs(rng.gauss(0.0, self.volatility / 2)))
+            candles.append(
+                Candle(
+                    open_time=index * step,
+                    open=price,
+                    high=high,
+                    low=low,
+                    close=close,
+                    volume=round(500 + rng.random() * 1500, 4),
+                )
+            )
+            price = close
+        self._cache[key] = candles
+        return candles
+
+    def fetch(self, symbol: str, interval: str, limit: int) -> list[Candle]:
+        if interval not in VALID_INTERVALS:
+            raise MarketDataError(f"{interval!r} is not an interval this source knows")
+        limit = max(1, min(int(limit), self.bars))
+        candles = self._series(symbol, interval)
+
+        step = INTERVAL_MS.get(interval, 300_000)
+        elapsed_bars = int(self.clock() * 1000 // step)
+        span = max(1, self.bars - limit)
+        end = limit + elapsed_bars % span
+        window = candles[end - limit : end]
+
+        # Restamp so the newest candle is the current bar: a chart drawn from
+        # this should show now, not 1970.
+        latest_open = (elapsed_bars - 1) * step
+        shift = latest_open - window[-1].open_time
+        return [
+            Candle(
+                open_time=c.open_time + shift,
+                open=c.open,
+                high=c.high,
+                low=c.low,
+                close=c.close,
+                volume=c.volume,
+            )
+            for c in window
+        ]
 
 
 # ----------------------------------------------------------------- binance --
@@ -285,6 +381,8 @@ def build_source(
     provider = (provider or os.getenv("MARKET_DATA_PROVIDER", "binance")).strip().lower()
     if provider == "replay":
         return ReplaySource()
+    if provider == "synthetic":
+        return SyntheticSource()
     if provider != "binance":
         raise MarketDataError(f"unknown market data provider {provider!r}")
 
