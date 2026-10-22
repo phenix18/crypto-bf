@@ -91,6 +91,7 @@ export function Sidebar({
   const agentToken = agentInfo?.token
 
   const navItems = [
+    { path: '/auto', icon: '⚡', label: language === 'zh' ? '自动交易台' : 'Auto-Trader', requiresAuth: false },
     { path: '/financial-events', icon: '🗞️', label: language === 'zh' ? '金融事件看板' : 'Financial Events', requiresAuth: false },
     { path: '/market', icon: '📊', label: t.nav.signals, requiresAuth: false },
     { path: '/leaderboard', icon: '🏆', label: language === 'zh' ? '排行榜' : 'Leaderboard', requiresAuth: false },

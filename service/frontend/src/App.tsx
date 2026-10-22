@@ -26,6 +26,7 @@ import {
   DiscussionsPage,
   LeaderboardPage,
 } from './AppPages'
+import { AutoTraderPage } from './AutoTraderPage'
 import { ChallengePage } from './ChallengePage'
 import { ExperimentAdminPage } from './ExperimentAdminPage'
 import { ResearchExportsPage } from './ResearchExportsPage'
@@ -275,6 +276,7 @@ function AppRouter({
           </div>
 
           <Routes>
+            <Route path="/auto" element={<AutoTraderPage />} />
             <Route path="/market" element={<SignalsFeed token={token} />} />
             <Route path="/leaderboard" element={<LeaderboardPage token={token} />} />
             <Route path="/challenges" element={<ChallengePage token={token} canAdmin={canAdmin} />} />
