@@ -218,6 +218,19 @@ class EngineConfigTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"AUTO_TRADE_ENABLED": "true"}, clear=True):
             self.assertTrue(EngineConfig.from_env().auto_trade)
 
+    def test_the_confluence_gate_is_settable_from_the_environment(self):
+        # The one number a user is most likely to want to move.
+        with mock.patch.dict(os.environ, {"CONFLUENCE_GATE": "80"}, clear=True):
+            config = EngineConfig.from_env()
+        self.assertEqual(config.confluence_gate, 80.0)
+        engine = build_engine(config, source=replay_source(), broker=PaperBroker())
+        self.assertEqual(engine.trader.calibration_config.confluence_gate, 80.0)
+        self.assertEqual(engine.calibration()["config"]["confluence_gate"], 80.0)
+
+    def test_a_bad_gate_value_keeps_the_default(self):
+        with mock.patch.dict(os.environ, {"CONFLUENCE_GATE": "high"}, clear=True):
+            self.assertEqual(EngineConfig.from_env().confluence_gate, EngineConfig.confluence_gate)
+
     def test_a_bad_equity_value_does_not_crash_the_build(self):
         with mock.patch.dict(os.environ, {"PAPER_EQUITY": "lots"}, clear=True):
             self.assertEqual(EngineConfig.from_env().equity, EngineConfig.equity)

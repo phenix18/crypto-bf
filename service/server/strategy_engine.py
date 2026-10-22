@@ -215,6 +215,10 @@ class StrategyConfig:
 
     # How close to structure counts as "at the level", as a fraction of price.
     structure_proximity: float = 0.004
+    # How far past the ATR stop a support or resistance may still drag it, as a
+    # multiple of that stop distance. Beyond this the level belongs to a
+    # different trade.
+    structure_reach: float = 1.5
 
     # Regime detection. A slope past this (fraction of price per bar) with the
     # EMAs stacked the same way means "trending"; anything else is a range.
@@ -656,6 +660,26 @@ def analyse(
     )
 
 
+def _relevant(level: Optional[float], price: float, atr_value: float, reach: float) -> Optional[float]:
+    """A level only counts when it is near enough to matter and far enough to be real.
+
+    Both bounds were put here by a bug. Without the far bound, a level from a
+    different price regime — the kind a long window picks up after a big move —
+    widened a stop to five times the entry price, and the engine reported the
+    resulting 0.007 reward-to-risk as though it were an ordinary reading.
+    Without the near bound, the pivot that noise leaves half an ATR away counts
+    as a wall and every target gets capped onto the entry.
+    """
+    if level is None or atr_value <= 0:
+        return None
+    distance = abs(level - price)
+    if distance < atr_value * 0.5:
+        return None
+    if distance > atr_value * reach:
+        return None
+    return level
+
+
 def _targets(
     price: float,
     direction: Direction,
@@ -667,32 +691,50 @@ def _targets(
     """Stop and target from ATR, nudged past the structure that would hit first.
 
     A stop parked exactly on support is the stop that gets taken out on the wick
-    that holds the level, so it goes a little beyond.
+    that holds the level, so it goes a little beyond — but only for a level
+    close enough to be part of this trade. ATR sets the scale; structure only
+    adjusts within it.
     """
     if direction is Direction.FLAT or atr_value is None or atr_value <= 0:
         return None, None, None
 
     stop_distance = atr_value * config.atr_stop_multiple
     target_distance = atr_value * config.atr_target_multiple
+    # How far out a level can still be part of this trade: a little beyond the
+    # stop on the risk side, no further than the target on the reward side.
+    stop_reach = config.atr_stop_multiple * config.structure_reach
+    target_reach = config.atr_target_multiple
 
     if direction is Direction.LONG:
+        floor_level = _relevant(support, price, atr_value, stop_reach)
         stop = price - stop_distance
-        if support is not None and support < price:
-            stop = min(stop, support - atr_value * 0.25)
+        if floor_level is not None and floor_level < price:
+            stop = min(stop, floor_level - atr_value * 0.25)
+
+        wall = _relevant(resistance, price, atr_value, target_reach)
         target = price + target_distance
-        if resistance is not None and resistance > price:
-            # Don't aim through a wall: take the near side of it.
-            target = min(target, resistance - atr_value * 0.1)
+        if wall is not None and wall > price:
+            # Don't aim through a wall: take the near side of it, and never
+            # past the entry — a "target" below the entry is a loss with a
+            # friendly name. When there is no room the reward/risk floor is
+            # what refuses the trade, not a fudged level.
+            target = max(price + atr_value * 0.25, min(target, wall - atr_value * 0.1))
     else:
+        ceiling_level = _relevant(resistance, price, atr_value, stop_reach)
         stop = price + stop_distance
-        if resistance is not None and resistance > price:
-            stop = max(stop, resistance + atr_value * 0.25)
+        if ceiling_level is not None and ceiling_level > price:
+            stop = max(stop, ceiling_level + atr_value * 0.25)
+
+        wall = _relevant(support, price, atr_value, target_reach)
         target = price - target_distance
-        if support is not None and support < price:
-            target = max(target, support + atr_value * 0.1)
+        if wall is not None and wall < price:
+            target = min(price - atr_value * 0.25, max(target, wall + atr_value * 0.1))
 
     risk = abs(price - stop)
-    reward = abs(target - price)
+    # Signed on purpose. An inverted target cannot survive the clamp above, but
+    # if one ever does, a negative ratio fails the floor instead of passing as
+    # a small positive number the way abs() let it.
+    reward = (target - price) if direction is Direction.LONG else (price - target)
     if risk <= 0:
         return stop, target, None
     return stop, target, reward / risk

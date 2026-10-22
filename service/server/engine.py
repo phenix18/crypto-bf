@@ -26,6 +26,7 @@ import calibration
 import indicators
 from auto_trader import AutoTrader, Portfolio
 from broker import Broker, build_broker
+from calibration import CalibrationConfig
 from llm_client import build_llm_client
 from market_data import CandleSource, build_source
 from strategy_engine import StrategyConfig, analyse
@@ -61,6 +62,10 @@ class EngineConfig:
     auto_trade: bool = False
     equity: float = 10_000.0
     candle_limit: int = 300
+    # The confluence a setup must clear while a bucket is still learning.
+    # Exposed because it is the one number a user is likely to want to move:
+    # raise it for fewer, stronger entries, lower it to gather a sample faster.
+    confluence_gate: float = CalibrationConfig().confluence_gate
 
     @classmethod
     def from_env(cls) -> "EngineConfig":
@@ -72,6 +77,7 @@ class EngineConfig:
             auto_trade=_flag("AUTO_TRADE_ENABLED", default=False),
             equity=_float("PAPER_EQUITY", cls.equity),
             candle_limit=int(_float("CANDLE_LIMIT", cls.candle_limit)),
+            confluence_gate=_float("CONFLUENCE_GATE", cls.confluence_gate),
         )
 
 
@@ -257,6 +263,7 @@ def build_engine(
         broker=broker,
         portfolio=Portfolio(equity=config.equity),
         strategy_config=StrategyConfig(),
+        calibration_config=CalibrationConfig(confluence_gate=config.confluence_gate),
         llm_client=build_llm_client(),
         candle_limit=config.candle_limit,
     )

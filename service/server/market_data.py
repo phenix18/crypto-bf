@@ -129,7 +129,13 @@ class SyntheticSource:
 
     seed: int = 7
     bars: int = 2_000
-    drift: float = 0.00004
+    # The drift is cycled by a slow sine, so the series alternates between
+    # trending stretches and ranges rather than being uniform noise. The
+    # amplitude is deliberately small against the volatility: a stronger drift
+    # produced more "tradable" setups and a series that climbed five-fold
+    # inside one window, which is not a market and would have been a
+    # demonstration of nothing.
+    drift: float = 0.0001
     volatility: float = 0.0035
     name: str = "synthetic"
     _cache: dict[tuple[str, str], list[Candle]] = field(default_factory=dict)

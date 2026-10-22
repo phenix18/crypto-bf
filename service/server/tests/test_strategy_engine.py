@@ -384,3 +384,119 @@ class ConfluenceScaleTests(unittest.TestCase):
         for prices in (uptrend(), downtrend(), chop()):
             result = analyse("BTCUSDT", "5m", build(prices))
             self.assertLessEqual(result.confluence, 100.0)
+
+
+class TargetPlacementTests(unittest.TestCase):
+    """Where the stop and the target land, and what structure may do to them.
+
+    All of these come from one bug found by running the engine on generated
+    data rather than on fixtures: a support level left over from a different
+    price regime widened a short's stop to five times the entry price, and the
+    resulting 0.007 reward-to-risk was reported as an ordinary reading. ATR
+    sets the scale here; structure may only adjust within it.
+    """
+
+    ATR = 2.0
+    PRICE = 100.0
+
+    def targets(self, direction, support=None, resistance=None, config=None):
+        from strategy_engine import _targets
+
+        return _targets(
+            self.PRICE, direction, self.ATR, support, resistance, config or StrategyConfig()
+        )
+
+    def test_without_structure_the_ratio_is_the_atr_ratio(self) -> None:
+        config = StrategyConfig()
+        _, _, ratio = self.targets(Direction.LONG)
+        self.assertAlmostEqual(ratio, config.atr_target_multiple / config.atr_stop_multiple)
+
+    def test_a_distant_level_cannot_drag_the_stop(self) -> None:
+        # The actual failure: a level hundreds of ATR away, from a different
+        # price regime, used to become the stop.
+        stop, _, ratio = self.targets(Direction.SHORT, resistance=self.PRICE + self.ATR * 400)
+        self.assertAlmostEqual(stop, self.PRICE + self.ATR * StrategyConfig().atr_stop_multiple)
+        self.assertGreater(ratio, 1.0)
+
+    def test_a_nearby_level_still_widens_the_stop(self) -> None:
+        # The rule it was there to serve has to survive the fix: a stop parked
+        # on support is the stop the wick takes out.
+        support = self.PRICE - self.ATR * 1.6
+        stop, _, _ = self.targets(Direction.LONG, support=support)
+        self.assertAlmostEqual(stop, support - self.ATR * 0.25)
+        self.assertLess(stop, self.PRICE - self.ATR * StrategyConfig().atr_stop_multiple)
+
+    def test_a_level_just_past_the_reach_is_ignored(self) -> None:
+        config = StrategyConfig()
+        edge = config.atr_stop_multiple * config.structure_reach
+        _, _, _ = self.targets(Direction.LONG, support=self.PRICE - self.ATR * (edge - 0.1))
+        far_stop, _, _ = self.targets(Direction.LONG, support=self.PRICE - self.ATR * (edge + 0.5))
+        self.assertAlmostEqual(far_stop, self.PRICE - self.ATR * config.atr_stop_multiple)
+
+    def test_noise_half_an_atr_away_is_not_a_wall(self) -> None:
+        config = StrategyConfig()
+        _, target, ratio = self.targets(Direction.LONG, resistance=self.PRICE + self.ATR * 0.2)
+        self.assertAlmostEqual(target, self.PRICE + self.ATR * config.atr_target_multiple)
+        self.assertAlmostEqual(ratio, config.atr_target_multiple / config.atr_stop_multiple)
+
+    def test_a_real_wall_caps_the_target(self) -> None:
+        wall = self.PRICE + self.ATR * 1.5
+        _, target, ratio = self.targets(Direction.LONG, resistance=wall)
+        self.assertAlmostEqual(target, wall - self.ATR * 0.1)
+        self.assertLess(ratio, StrategyConfig().min_risk_reward)
+
+    def test_a_capped_target_never_lands_below_the_entry(self) -> None:
+        # A "take profit" below a long's entry is a loss with a friendly name.
+        _, target, ratio = self.targets(Direction.LONG, resistance=self.PRICE + self.ATR * 0.55)
+        self.assertGreater(target, self.PRICE)
+        self.assertGreater(ratio, 0.0)
+        self.assertLess(ratio, StrategyConfig().min_risk_reward)
+
+    def test_a_capped_short_target_never_lands_above_the_entry(self) -> None:
+        _, target, ratio = self.targets(Direction.SHORT, support=self.PRICE - self.ATR * 0.55)
+        self.assertLess(target, self.PRICE)
+        self.assertGreater(ratio, 0.0)
+
+    def test_the_short_mirror_holds(self) -> None:
+        config = StrategyConfig()
+        stop, target, ratio = self.targets(Direction.SHORT)
+        self.assertAlmostEqual(stop, self.PRICE + self.ATR * config.atr_stop_multiple)
+        self.assertAlmostEqual(target, self.PRICE - self.ATR * config.atr_target_multiple)
+        self.assertAlmostEqual(ratio, config.atr_target_multiple / config.atr_stop_multiple)
+
+    def test_every_actionable_proposal_points_the_right_way(self) -> None:
+        """The invariant, swept over generated data rather than one fixture.
+
+        This is the test that would have caught the original bug: it fails the
+        moment a proposal is tradable with its target on the wrong side of its
+        entry, whatever produced that.
+        """
+        import os
+        import sys
+
+        sys.path.insert(0, os.path.dirname(SERVER_DIR))
+        from market_data import SyntheticSource
+
+        source = SyntheticSource(clock=lambda: 1_700_000_000.0)
+        checked = 0
+        for symbol in ("BTCUSDT", "ETHUSDT", "SOLUSDT", "ADAUSDT", "XRPUSDT"):
+            series = source._series(symbol, "5m")
+            for end in range(300, len(series), 97):
+                result = analyse(symbol, "5m", series[end - 300 : end])
+                if not result.actionable:
+                    continue
+                checked += 1
+                if result.direction is Direction.LONG:
+                    self.assertGreater(result.take_profit, result.entry)
+                    self.assertLess(result.stop_loss, result.entry)
+                else:
+                    self.assertLess(result.take_profit, result.entry)
+                    self.assertGreater(result.stop_loss, result.entry)
+                self.assertGreaterEqual(result.risk_reward, StrategyConfig().min_risk_reward)
+                # And the stop stays on the ATR's scale rather than a level's.
+                reach = StrategyConfig().atr_stop_multiple * StrategyConfig().structure_reach
+                self.assertLessEqual(
+                    abs(result.entry - result.stop_loss),
+                    result.readings.atr * (reach + 0.3),
+                )
+        self.assertGreater(checked, 20, 'the sweep needs actionable proposals to be meaningful')
