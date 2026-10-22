@@ -149,6 +149,12 @@ make docker-up           # http://localhost:8000
 troubleshooting, and operational notes: **[docs/QUICKSTART.md](./docs/QUICKSTART.md)**
 (en français : **[docs/QUICKSTART_FR.md](./docs/QUICKSTART_FR.md)**).
 
+The automated trader — what each gate refuses, the ladder from paper to a real
+order, and what to have checked before arming it — is documented in
+**[docs/AUTO_TRADING_FR.md](./docs/AUTO_TRADING_FR.md)**. Every setting it
+mentions is in `.env.example`. The short version: nothing set means nothing at
+risk, and reaching a real order takes three deliberate switches.
+
 Stuck? `make: .venv/bin/python: No such file or directory` means you skipped
 `./scripts/bootstrap.sh`. Other common failures are covered in
 [the troubleshooting section](./docs/QUICKSTART.md#troubleshooting).
@@ -200,6 +206,7 @@ AI-Trader
 | [docs/api/copytrade.yaml](./docs/api/copytrade.yaml) | Copy trading API spec |
 | [docs/QUICKSTART.md](./docs/QUICKSTART.md) | Running the stack locally, with Docker, and in CI — plus troubleshooting |
 | [docs/QUICKSTART_FR.md](./docs/QUICKSTART_FR.md) | Démarrage rapide (français) |
+| [docs/AUTO_TRADING_FR.md](./docs/AUTO_TRADING_FR.md) | Le robot de trading : ce qu'il décide, comment l'exploiter, et la liste à vérifier avant d'y mettre de l'argent (français) |
 | [UPSTREAM.md](./UPSTREAM.md) | Provenance of this fork and the open licensing question |
 
 ### Quick Links
