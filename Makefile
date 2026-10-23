@@ -8,7 +8,7 @@ API_PORT ?= 8000
 BASE_URL ?= http://127.0.0.1:$(API_PORT)
 
 .DEFAULT_GOAL := help
-.PHONY: help bootstrap install test test-frontend test-all api worker frontend build dev smoke clean \
+.PHONY: help bootstrap install test test-frontend test-app test-all api worker frontend build dev smoke clean \
         docker-up docker-down docker-logs require-venv require-npm require-npm-binary require-docker
 
 help: ## Show this help
@@ -79,7 +79,10 @@ test: require-venv ## Run the backend test suite
 test-frontend: require-npm ## Run the frontend unit tests
 	cd service/frontend && npm test
 
-test-all: test test-frontend ## Run both suites
+test-app: require-venv ## Run the PC/Android application tests
+	cd app && ../$(PY) -m pytest tests -q
+
+test-all: test test-app test-frontend ## Run every suite
 
 api: require-venv ## Start the FastAPI server (default http://127.0.0.1:8000)
 	cd service/server && API_STDERR_LOG=true ../../$(PY) -m uvicorn main:app --host 0.0.0.0 --port $(API_PORT) --reload
