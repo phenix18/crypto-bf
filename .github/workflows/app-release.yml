@@ -77,7 +77,7 @@ jobs:
         run: |
           set -o pipefail
           python -m pytest tests -q 2>&1 | tee pytest.log || {
-            tail -n 25 pytest.log | while IFS= read -r ligne; do echo "::error::$ligne"; done
+            ../scripts/annoter_echec.sh pytest.log
             exit 1
           }
 
@@ -130,9 +130,9 @@ jobs:
             )
           fi
           set -o pipefail
+          # The signing arguments are never echoed: only flet's own output.
           flet build apk "${args[@]}" 2>&1 | tee build.log || {
-            # The signing arguments are never echoed: only flet's own output.
-            tail -n 30 build.log | while IFS= read -r ligne; do echo "::error::$ligne"; done
+            ../scripts/annoter_echec.sh build.log
             exit 1
           }
 
@@ -206,7 +206,7 @@ jobs:
         run: |
           set -o pipefail
           python -m pytest tests -q 2>&1 | tee pytest.log || {
-            tail -n 25 pytest.log | while IFS= read -r ligne; do echo "::error::$ligne"; done
+            ../scripts/annoter_echec.sh pytest.log
             exit 1
           }
 
@@ -217,7 +217,7 @@ jobs:
           set -o pipefail
           flet build ${{ matrix.cible }} --build-number ${{ github.run_number }} \
             --no-rich-output --yes 2>&1 | tee build.log || {
-            tail -n 30 build.log | while IFS= read -r ligne; do echo "::error::$ligne"; done
+            ../scripts/annoter_echec.sh build.log
             exit 1
           }
 
