@@ -15,8 +15,12 @@ journal="${1:?usage: annoter_echec.sh <fichier-journal>}"
 {
   # Gradle says what it refused right under this heading.
   sed -n '/What went wrong/,+6p' "$journal"
-  # Compiler and toolchain errors, wherever they sit in the log.
-  grep -aiE "error:|caused by:|could not |not found|sdk location|license" "$journal" | head -n 5
+  # Compiler and toolchain errors, wherever they sit in the log. The Android
+  # SDK prints a licence line per package it checks; those matched "license"
+  # and ate the whole annotation budget on the first run that needed it.
+  grep -aiE "error:|caused by:|could not |not found|sdk location|licen[cs]e" "$journal" \
+    | grep -aivE "licen[cs]e for package|checking the licen[cs]e|licen[cs]e .* accepted" \
+    | head -n 5
   # And the last word, which is usually the task that gave up.
   tail -n 3 "$journal"
 } | sed 's/[[:space:]]\{2,\}/ /g; s/^ //; s/ $//' \
