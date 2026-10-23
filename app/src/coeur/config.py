@@ -6,7 +6,9 @@ tests, et il doit rester lisible sans lancer quoi que ce soit.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
+from pathlib import Path
 
 APP_NOM = "AI-Trader"
 APP_VERSION = "1.0.0"
@@ -37,6 +39,23 @@ SOURCES = ("binance", "synthetic")
 MODE_LOCAL = "local"
 MODE_RELIE = "relie"
 MODES = (MODE_LOCAL, MODE_RELIE)
+
+
+def dossier_donnees(environnement=None, maison=None) -> Path:
+    """Où l'application écrit sa base et ses réglages.
+
+    Sur Android et sur les paquets de bureau, Flet pose `FLET_APP_STORAGE_DATA`
+    sur un dossier privé que le système sauvegarde et nettoie avec
+    l'application ; c'est là que les données doivent aller. En développement
+    cette variable n'existe pas, et un dossier dans le répertoire personnel
+    évite d'écrire une base dans le dépôt au premier lancement.
+    """
+    environnement = os.environ if environnement is None else environnement
+    depuis_flet = (environnement.get("FLET_APP_STORAGE_DATA") or "").strip()
+    if depuis_flet:
+        return Path(depuis_flet)
+    maison = Path.home() if maison is None else Path(maison)
+    return maison / ".aitrader"
 
 
 @dataclass

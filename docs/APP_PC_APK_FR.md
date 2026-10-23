@@ -53,12 +53,21 @@ Donc :
 
 | Plateforme | Ce qu'elle a le droit de faire |
 |---|---|
-| **Serveur** (déjà là) | la boucle automatique sans surveillance, seule |
-| **PC** | tout : analyse, boucle automatique tant que la fenêtre est ouverte, supervision |
-| **Android** | analyse à la demande, supervision, coupe-circuit, ordre **confirmé à la main** |
+| **Serveur** (déjà là) | la boucle automatique sans surveillance, et l'exécution : seul |
+| **PC** | analyse à la demande, supervision, coupe-circuit |
+| **Android** | analyse à la demande, supervision, coupe-circuit |
 
-L'APK est un **poste de pilotage**, pas un robot de poche. Elle lit, elle
-montre, elle permet d'arrêter ; elle ne laisse pas une boucle tourner seule.
+L'application livrée est un **poste de pilotage**, sur téléphone comme sur PC.
+Elle lit, elle montre, elle permet d'arrêter ; elle ne laisse pas une boucle
+tourner seule et **ne passe aucun ordre elle-même**.
+
+Le PC aurait pu tenir une boucle — un ordinateur de bureau ne gèle pas ses
+processus comme un téléphone. Elle n'y est pas, pour deux raisons : la boucle
+existe déjà dans `service/`, où elle tourne sans interface et survit à la
+fermeture d'une fenêtre ; et une application qui ne passe aucun ordre n'a
+aucune raison de détenir une clé d'échange, ce qui retire de l'APK le seul
+secret qu'elle aurait pu contenir. La même décision sert les deux plateformes.
+
 Ce n'est pas une limite technique qu'on contourne plus tard : c'est le
 comportement voulu.
 

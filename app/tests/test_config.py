@@ -61,3 +61,27 @@ class TestSerialisation:
     def test_un_dictionnaire_vide_donne_les_defauts(self):
         assert Reglages.from_dict({}).mode == MODE_LOCAL
         assert Reglages.from_dict(None).source in SOURCES
+
+
+class TestDossierDonnees:
+    def test_flet_decide_quand_il_le_dit(self):
+        # Sur Android et dans les paquets de bureau, c'est le dossier privé
+        # que le système sauvegarde et nettoie avec l'application.
+        from coeur.config import dossier_donnees
+
+        chemin = dossier_donnees({"FLET_APP_STORAGE_DATA": "/var/data/aitrader"})
+        assert str(chemin) == "/var/data/aitrader"
+
+    def test_sans_flet_on_ecrit_dans_le_repertoire_personnel(self):
+        # Jamais le dossier courant : un `flet run` depuis le dépôt y
+        # déposerait une base de trading.
+        from coeur.config import dossier_donnees
+
+        chemin = dossier_donnees({}, maison="/home/essai")
+        assert str(chemin) == "/home/essai/.aitrader"
+
+    def test_une_variable_vide_compte_comme_absente(self):
+        from coeur.config import dossier_donnees
+
+        chemin = dossier_donnees({"FLET_APP_STORAGE_DATA": "  "}, maison="/home/essai")
+        assert str(chemin) == "/home/essai/.aitrader"

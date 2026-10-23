@@ -31,6 +31,12 @@ jobs:
       - name: Run tests
         run: python -m pytest
 
+      # Flet n'est pas une dépendance du serveur : il est installé ici pour
+      # que les tests des écrans de l'application tournent vraiment au lieu
+      # d'être sautés. 5 Mo, aucune coque Flutter à ce stade.
+      - name: Install Flet (application UI tests)
+        run: pip install flet==0.86.5
+
       - name: Run the PC/Android application tests
         working-directory: app
         run: python -m pytest tests -q
