@@ -206,6 +206,7 @@ AI-Trader
 | [docs/api/copytrade.yaml](./docs/api/copytrade.yaml) | Copy trading API spec |
 | [docs/QUICKSTART.md](./docs/QUICKSTART.md) | Running the stack locally, with Docker, and in CI — plus troubleshooting |
 | [docs/QUICKSTART_FR.md](./docs/QUICKSTART_FR.md) | Démarrage rapide (français) |
+| [docs/APP_PC_APK_FR.md](./docs/APP_PC_APK_FR.md) | Version PC et APK : pile retenue, modèle REA, schéma SQLite, permissions, build, signature (français) |
 | [docs/AUTO_TRADING_FR.md](./docs/AUTO_TRADING_FR.md) | Le robot de trading : ce qu'il décide, comment l'exploiter, et la liste à vérifier avant d'y mettre de l'argent (français) |
 | [UPSTREAM.md](./UPSTREAM.md) | Provenance of this fork and the open licensing question |
 

@@ -1,0 +1,34 @@
+# Configuration de build Flet : un seul projet, deux cibles (PC et Android).
+#
+# La liste des dépendances tient en une ligne et doit y rester : le moteur de
+# trading n'utilise que la bibliothèque standard, et c'est ce qui fait tenir
+# l'APK sous ~30 Mo. Ajouter pandas ou numpy ici coûterait 55 Mo pour des
+# calculs que indicators.py sait déjà faire en Python pur.
+
+[project]
+name = "ai-trader-desk"
+version = "1.0.0"
+description = "Poste de trading automatique AI-Trader : analyse, supervision, coupe-circuit"
+requires-python = ">=3.12"
+dependencies = [
+  "flet==0.86.5",
+]
+
+[tool.flet]
+org = "com.aitrader"
+product = "AI-Trader"
+company = "AI-Trader"
+copyright = "AI-Trader"
+
+[tool.flet.app]
+path = "src"
+
+[tool.flet.android]
+split_per_abi = true
+
+# Deux permissions, pas une de plus. La base vit dans le dossier privé de
+# l'application et l'export passe par le partage Android, qui n'en demande
+# aucune.
+[tool.flet.android.permission]
+"android.permission.INTERNET" = true
+"android.permission.ACCESS_NETWORK_STATE" = true
