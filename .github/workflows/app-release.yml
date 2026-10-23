@@ -56,8 +56,10 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - name: Install Flet
-        run: pip install "flet[cli]==0.86.5"
+      # pytest too: this job has no requirements.txt behind it, so nothing
+      # else brings it in and the test step would fail before the build.
+      - name: Install Flet and pytest
+        run: pip install "flet[cli]==0.86.5" pytest
 
       # A packaged engine that has drifted from the server's would ship wrong
       # decisions to a phone, where they are hardest to notice. Cheaper to fail
@@ -173,8 +175,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ninja-build libgtk-3-dev clang cmake pkg-config
 
-      - name: Install Flet
-        run: pip install "flet[cli]==0.86.5"
+      # pytest too: this job has no requirements.txt behind it, so nothing
+      # else brings it in and the test step would fail before the build.
+      - name: Install Flet and pytest
+        run: pip install "flet[cli]==0.86.5" pytest
 
       - name: Check the engine copy is in sync
         run: python scripts/sync_engine.py --check
