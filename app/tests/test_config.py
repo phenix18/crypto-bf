@@ -5,6 +5,8 @@ précédente a pu écrire autrement. Planter au démarrage à cause d'un nombre
 hors bornes serait la pire réponse possible.
 """
 
+from pathlib import Path
+
 from coeur.config import MODE_LOCAL, SOURCES, Reglages
 
 
@@ -64,24 +66,32 @@ class TestSerialisation:
 
 
 class TestDossierDonnees:
+    """Les chemins se comparent en `Path`, jamais en chaînes.
+
+    `str(Path("/var/data"))` rend « \\var\\data » sur Windows, et
+    l'application se construit aussi pour Windows. Comparer des `Path` dit ce
+    qu'on veut vraiment dire et tient sur les deux systèmes.
+    """
+
     def test_flet_decide_quand_il_le_dit(self):
         # Sur Android et dans les paquets de bureau, c'est le dossier privé
         # que le système sauvegarde et nettoie avec l'application.
         from coeur.config import dossier_donnees
 
-        chemin = dossier_donnees({"FLET_APP_STORAGE_DATA": "/var/data/aitrader"})
-        assert str(chemin) == "/var/data/aitrader"
+        assert dossier_donnees({"FLET_APP_STORAGE_DATA": "/var/data/aitrader"}) == Path(
+            "/var/data/aitrader"
+        )
 
     def test_sans_flet_on_ecrit_dans_le_repertoire_personnel(self):
         # Jamais le dossier courant : un `flet run` depuis le dépôt y
         # déposerait une base de trading.
         from coeur.config import dossier_donnees
 
-        chemin = dossier_donnees({}, maison="/home/essai")
-        assert str(chemin) == "/home/essai/.aitrader"
+        assert dossier_donnees({}, maison="/home/essai") == Path("/home/essai/.aitrader")
 
     def test_une_variable_vide_compte_comme_absente(self):
         from coeur.config import dossier_donnees
 
-        chemin = dossier_donnees({"FLET_APP_STORAGE_DATA": "  "}, maison="/home/essai")
-        assert str(chemin) == "/home/essai/.aitrader"
+        assert dossier_donnees({"FLET_APP_STORAGE_DATA": "  "}, maison="/home/essai") == Path(
+            "/home/essai/.aitrader"
+        )

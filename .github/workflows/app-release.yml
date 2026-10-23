@@ -67,9 +67,17 @@ jobs:
       - name: Check the engine copy is in sync
         run: python scripts/sync_engine.py --check
 
+      # The failing lines are echoed as annotations: a run's raw logs are not
+      # reachable from every tool, and "exit code 1" alone says nothing.
       - name: Run the application tests
         working-directory: app
-        run: python -m pytest tests -q
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest tests -q 2>&1 | tee pytest.log || {
+            tail -n 25 pytest.log | while IFS= read -r ligne; do echo "::error::$ligne"; done
+            exit 1
+          }
 
       - name: Read the version
         id: version
@@ -183,9 +191,17 @@ jobs:
       - name: Check the engine copy is in sync
         run: python scripts/sync_engine.py --check
 
+      # The failing lines are echoed as annotations: a run's raw logs are not
+      # reachable from every tool, and "exit code 1" alone says nothing.
       - name: Run the application tests
         working-directory: app
-        run: python -m pytest tests -q
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest tests -q 2>&1 | tee pytest.log || {
+            tail -n 25 pytest.log | while IFS= read -r ligne; do echo "::error::$ligne"; done
+            exit 1
+          }
 
       - name: Build
         working-directory: app
