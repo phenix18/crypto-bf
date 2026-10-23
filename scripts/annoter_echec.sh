@@ -15,14 +15,16 @@ journal="${1:?usage: annoter_echec.sh <fichier-journal>}"
 {
   # Gradle says what it refused right under this heading.
   sed -n '/What went wrong/,+6p' "$journal"
-  # Compiler and toolchain errors, wherever they sit in the log. The Android
-  # SDK prints a licence line per package it checks; those matched "license"
-  # and ate the whole annotation budget on the first run that needed it.
-  grep -aiE "error:|caused by:|could not |not found|sdk location|licen[cs]e" "$journal" \
-    | grep -aivE "licen[cs]e for package|checking the licen[cs]e|licen[cs]e .* accepted" \
-    | head -n 5
+  # Compiler and toolchain errors. Taken from the END of the log, not the
+  # start: a build prints plenty of harmless "error" strings on its way, and
+  # the one that stopped it is the last. The Android SDK's per-package licence
+  # chatter is excluded — it ate the whole annotation budget on the first run
+  # that needed it.
+  grep -aiE "error|exception|fatal|cannot|unable to|could not|not found|failed" "$journal" \
+    | grep -aivE "licen[cs]e|^warning|\[!\]|see the log of failed command" \
+    | tail -n 6
   # And the last word, which is usually the task that gave up.
-  tail -n 3 "$journal"
+  tail -n 4 "$journal"
 } | sed 's/[[:space:]]\{2,\}/ /g; s/^ //; s/ $//' \
   | grep -v '^$' | awk '!vu[$0]++' | head -n 10 | cut -c1-360 \
   | while IFS= read -r ligne; do echo "::error::$ligne"; done
