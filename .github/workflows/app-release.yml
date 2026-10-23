@@ -1,0 +1,195 @@
+name: Application build (PC and Android)
+
+# Builds the Flet application. Separate from ci.yml on purpose: these jobs pull
+# a Flutter SDK and an Android toolchain, which is several minutes and has no
+# business running on every push.
+#
+# Run it from the Actions tab, or push a tag such as app-v1.0.0.
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: "Android versionCode (must increase with every release)"
+        required: false
+        default: ""
+      targets:
+        description: "What to build"
+        required: true
+        default: "apk"
+        type: choice
+        options: ["apk", "desktop", "all"]
+  push:
+    tags: ["app-v*"]
+
+concurrency:
+  group: app-release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # flet 0.86.5 asks for this exact Flutter minor; it refuses to build on
+  # another one. `python -c "import flet.version"` prints the required value.
+  FLUTTER_VERSION: "3.44.8"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  apk:
+    name: Android APK
+    if: >-
+      github.event_name == 'push' ||
+      inputs.targets == 'apk' || inputs.targets == 'all'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install Flet
+        run: pip install "flet[cli]==0.86.5"
+
+      # A packaged engine that has drifted from the server's would ship wrong
+      # decisions to a phone, where they are hardest to notice. Cheaper to fail
+      # here than to debug it on a device.
+      - name: Check the engine copy is in sync
+        run: python scripts/sync_engine.py --check
+
+      - name: Run the application tests
+        working-directory: app
+        run: python -m pytest tests -q
+
+      - name: Read the version
+        id: version
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import re, pathlib
+          texte = pathlib.Path("app/pyproject.toml").read_text(encoding="utf-8")
+          print("value=" + re.search(r'^version\s*=\s*"([^"]+)"', texte, re.M).group(1))
+          PY
+
+      # The keystore never touches the workspace: a file under app/ could be
+      # swept into an artifact or, worse, into a commit. RUNNER_TEMP is wiped
+      # with the runner.
+      - name: Unpack the signing key
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret: the APK will carry a debug signature and is for internal testing only."
+          fi
+
+      - name: Build the APK
+        working-directory: app
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -eu
+          args=(
+            --build-version "${{ steps.version.outputs.value }}"
+            --build-number "${{ inputs.build_number || github.run_number }}"
+            --arch arm64-v8a
+            --no-rich-output
+            --yes
+          )
+          if [ "${{ steps.signing.outputs.available }}" = "true" ]; then
+            args+=(
+              --android-signing-key-store "$RUNNER_TEMP/release.jks"
+              --android-signing-key-store-password "$KEYSTORE_PASSWORD"
+              --android-signing-key-password "${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
+              --android-signing-key-alias "${KEY_ALIAS:-aitrader}"
+            )
+          fi
+          flet build apk "${args[@]}"
+
+      - name: Report what came out
+        working-directory: app
+        run: |
+          ls -lh build/apk/
+          # An APK over ~45 MB means a native dependency slipped into the
+          # bundle; the engine itself is pure Python and weighs 176 KB.
+          du -sh build/apk/*.apk
+
+      # Note the labels rather than an empty string: in a GitHub expression
+      # `cond && '' || 'x'` always yields 'x', because an empty string is
+      # falsy. A signed build would have been labelled unsigned.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: >-
+            ai-trader-apk-${{ steps.version.outputs.value }}-${{
+            steps.signing.outputs.available == 'true' && 'signed' || 'UNSIGNED' }}
+          path: app/build/apk/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  desktop:
+    name: Desktop (${{ matrix.cible }})
+    if: >-
+      github.event_name == 'push' ||
+      inputs.targets == 'desktop' || inputs.targets == 'all'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            cible: linux
+          - os: windows-latest
+            cible: windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      # Flutter's Linux target compiles a GTK shell; these are its build
+      # dependencies, absent from the runner image.
+      - name: Install the Linux build dependencies
+        if: matrix.cible == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgtk-3-dev clang cmake pkg-config
+
+      - name: Install Flet
+        run: pip install "flet[cli]==0.86.5"
+
+      - name: Check the engine copy is in sync
+        run: python scripts/sync_engine.py --check
+
+      - name: Run the application tests
+        working-directory: app
+        run: python -m pytest tests -q
+
+      - name: Build
+        working-directory: app
+        run: flet build ${{ matrix.cible }} --build-number ${{ github.run_number }} --no-rich-output --yes
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-trader-${{ matrix.cible }}
+          path: app/build/${{ matrix.cible }}/**
+          if-no-files-found: error
+          retention-days: 14

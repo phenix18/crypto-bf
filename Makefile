@@ -9,7 +9,8 @@ BASE_URL ?= http://127.0.0.1:$(API_PORT)
 
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap install test test-frontend test-app test-all api worker frontend build dev smoke clean \
-        docker-up docker-down docker-logs require-venv require-npm require-npm-binary require-docker
+        app-run app-icons app-apk app-desktop \
+        docker-up docker-down docker-logs require-venv require-npm require-npm-binary require-docker require-flet
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -73,6 +74,15 @@ bootstrap: ## Create the venv, install backend + frontend deps, seed .env
 install: ## Install/refresh backend dependencies only
 	$(PIP) install -r service/requirements.txt
 
+require-flet: require-venv
+	@$(PY) -c "import flet" 2>/dev/null || { \
+		echo ""; \
+		echo "  Flet is not installed in $(VENV)/."; \
+		echo "  Run this first:   $(PIP) install 'flet[cli]==0.86.5'"; \
+		echo ""; \
+		exit 1; \
+	}
+
 test: require-venv ## Run the backend test suite
 	$(PY) -m pytest
 
@@ -83,6 +93,24 @@ test-app: require-venv ## Run the PC/Android application tests
 	cd app && ../$(PY) -m pytest tests -q
 
 test-all: test test-app test-frontend ## Run every suite
+
+# ------------------------------------------------- PC/Android application ----
+# `flet build` needs a Flutter SDK (3.44.8 for flet 0.86.5), and the APK also
+# needs JDK 17 and the Android SDK. None of that is required to run the tests
+# or the application itself, so these targets stay separate from `install`.
+# The release builds run in CI: .github/workflows/app-release.yml.
+
+app-run: require-flet ## Run the application on this machine
+	cd app && ../$(PY) -m flet.cli run src/main.py
+
+app-icons: require-venv ## Regenerate the icon and splash screens from the palette
+	$(PY) app/scripts/icone.py
+
+app-apk: require-flet ## Build the Android APK (arm64-v8a, debug signature)
+	cd app && ../$(PY) -m flet.cli build apk --arch arm64-v8a --build-number $${BUILD_NUMBER:-1}
+
+app-desktop: require-flet ## Build the desktop application for this platform
+	cd app && ../$(PY) -m flet.cli build $${FLET_TARGET:-linux} --build-number $${BUILD_NUMBER:-1}
 
 api: require-venv ## Start the FastAPI server (default http://127.0.0.1:8000)
 	cd service/server && API_STDERR_LOG=true ../../$(PY) -m uvicorn main:app --host 0.0.0.0 --port $(API_PORT) --reload

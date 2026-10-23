@@ -61,6 +61,14 @@ copies et échoue si elles divergent.
 ## Builds
 
 ```bash
-flet build windows --build-version 1.0.0 --build-number 1
-flet build apk --split-per-abi --build-version 1.0.0 --build-number 1
+make app-apk                     # APK arm64-v8a
+make app-desktop                 # exécutable pour cette plateforme
+make app-icons                   # régénérer l'icône depuis la palette
 ```
+
+Il faut Flutter **3.44.8** exactement (Flet 0.86.5 refuse un autre mineur),
+plus JDK 17 et l'Android SDK pour l'APK. En CI, le workflow
+`app-release.yml` s'en charge, au tag `app-v*` ou à la demande.
+
+Keystore, secrets de signature, vérification de l'APK et installation sur le
+téléphone : [`docs/APP_BUILD_FR.md`](../docs/APP_BUILD_FR.md).

@@ -279,24 +279,32 @@ confluence).
 ## 4. Arborescence
 
 ```
-app/                             # la nouvelle application, PC et Android
+app/                             # l'application, PC et Android
   pyproject.toml                 # configuration flet build
-  HYPOTHESES.md
+  README.md  HYPOTHESES.md
+  scripts/
+    icone.py                     # icône et écrans d'accueil, depuis la palette
   src/
     main.py                      # point d'entrée Flet, thème, navigation
     engine/                      # LE MOTEUR, copié depuis service/server (cf. §5)
       indicators.py  strategy_engine.py  risk_manager.py  calibration.py
       market_data.py  broker.py  ai_agents.py  llm_client.py  auto_trader.py
     coeur/                       # logique applicative pure, sans flet
-      config.py                  # nom, version, palette, réglages par défaut
+      config.py                  # nom, version, palette, réglages, dossier privé
+      moteur.py                  # le seul endroit qui importe engine/
       stockage.py                # SQLite : le schéma REA ci-dessus
-      session.py                 # mode local/relié, clés, watchlist
+      session.py                 # mode local/relié, analyse, coupe-circuit
       distant.py                 # client HTTP de /api/auto/*
       formats.py                 # nombres, dates, R, pourcentages en français
-    vues/                        # une fonction par écran, aucune logique métier
-      cockpit.py  analyse.py  positions.py  reglages.py  journal.py
-    assets/                      # icon.png, splash.png
-  tests/                         # pytest sur coeur/ et engine/, sans UI
+      bilan.py                   # réussite et espérance d'un historique
+      saisie.py                  # lecture des champs du formulaire
+      graphique.py               # géométrie du graphique, sans flet
+    vues/                        # les écrans, aucune règle de trading
+      communs.py                 # cartes, badges, boutons, votes, avis
+      graphique.py               # le dessin sur canvas
+      cockpit.py  analyse.py  journal.py  reglages.py
+    assets/                      # icon.png, splash.png, splash_dark.png
+  tests/                         # pytest : cœur, stockage, géométrie, écrans
 scripts/
   sync_engine.py                 # recopie les 9 modules dans app/src/engine
 ```
@@ -367,21 +375,21 @@ Store sauf cas précis, et rien ici n'en a besoin.
 ## 8. Builds
 
 ```bash
-# PC
-flet build windows --build-version 1.0.0 --build-number 1
-flet build linux   --build-version 1.0.0 --build-number 1
-
-# Android
-flet build apk --split-per-abi --build-version 1.0.0 --build-number 1
-# sortie : build/apk/app-arm64-v8a-release.apk
+make app-apk                     # APK arm64-v8a
+make app-desktop                 # exécutable pour cette plateforme
+FLET_TARGET=windows make app-desktop
 ```
 
-Prérequis : Flutter compatible avec la version de Flet épinglée, JDK 17,
-Android SDK (platform 36, build-tools), Python 3.12+.
+Prérequis : **Flutter 3.44.8** exactement (Flet 0.86.5 refuse un autre mineur),
+JDK 17 et l'Android SDK pour l'APK, Python 3.12+.
 
-CI : un workflow GitHub Actions sur `ubuntu-latest` (`actions/setup-java@v4`
-avec Java 17, `subosito/flutter-action@v2`, `pip install flet`) publie l'APK en
-artefact à chaque tag. Le `.exe` Windows demande un runner `windows-latest`.
+CI : [`.github/workflows/app-release.yml`](../.github/workflows/app-release.yml)
+construit l'APK sur `ubuntu-latest` et les exécutables de bureau sur
+`ubuntu-latest` et `windows-latest`, au tag `app-v*` ou à la demande. Il vérifie
+d'abord que la copie du moteur n'a pas dérivé et relance les tests.
+
+La procédure complète — keystore, secrets, vérification de l'APK, installation
+sur le téléphone — est dans [`APP_BUILD_FR.md`](APP_BUILD_FR.md).
 
 ---
 
@@ -399,6 +407,8 @@ artefact à chaque tag. Le `.exe` Windows demande un runner `windows-latest`.
 - `versionCode` incrémenté à chaque livraison.
 - La clé de debug suffit pour un test entre vos appareils ; elle ne convient
   pas pour une distribution, car elle diffère d'une machine à l'autre.
+- Les quatre secrets GitHub attendus par le workflow et la vérification du
+  fichier produit : [`APP_BUILD_FR.md`](APP_BUILD_FR.md) §3 et §5.
 
 ---
 
