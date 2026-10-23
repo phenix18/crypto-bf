@@ -23,17 +23,21 @@ copyright = "AI-Trader"
 [tool.flet.app]
 path = "src"
 
-# L'implémentation Android de `shared_preferences` est tirée par Flet, et
-# depuis sa version 2.5.0 elle dépend de `jni`. Ces liaisons n'existent que
-# sur Android : sur Linux et Windows, la compilation Dart s'arrête sur
+# Plusieurs greffons tirés par Flet embarquent des liaisons générées par
+# `jnigen`, qui commencent toutes par un contrôle de version :
 #
 #   const _$jniVersionCheck = jni$_.JniVersionCheck(1, 1);
-#   ERROR: Target kernel_snapshot_program failed
+#   ERROR: Constant evaluation error
 #
-# 2.4.28 est la dernière version sans `jni`, et elle fait le même travail.
-# À retirer quand Flet n'embarquera plus cette dépendance pour le bureau.
+# Ce contrôle est une assertion constante dans `jni` : elle compare la version
+# attendue par les liaisons (1.1) à celle du paquet résolu. Elle n'échoue donc
+# que si la résolution retient un `jni` antérieur — un 0.x, dont la version
+# majeure vaut 0. Épingler les greffons un par un ne traite que le symptôme :
+# le premier épinglé laisse simplement la place au suivant.
+#
+# À retirer quand la résolution de Flet retiendra `jni` 1.1 d'elle-même.
 [tool.flet.flutter.pubspec.dependency_overrides]
-shared_preferences_android = "2.4.28"
+jni = "1.1.0"
 
 # Les couleurs du fond de l'écran d'accueil, derrière src/assets/splash*.png.
 # Sans elles, Flutter met du blanc : un éclair blanc avant une interface
