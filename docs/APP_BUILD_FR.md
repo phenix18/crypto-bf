@@ -174,3 +174,4 @@ lancement, analyse d'une paire réelle, rotation, mode sombre, coupure réseau.
 | « Application non installée » sans autre message | APK signée avec une autre clé que celle déjà installée |
 | L'artefact s'appelle `…-UNSIGNED` | les secrets de signature ne sont pas en place (§3) |
 | L'APK dépasse 45 Mo | une dépendance native est entrée dans `pyproject.toml` |
+| `JniVersionCheck` / `kernel_snapshot_program failed` sur Linux ou Windows | `shared_preferences_android` ≥ 2.5.0 dépend de `jni`, qui n'existe que sur Android. `app/pyproject.toml` l'épingle à 2.4.28 ; à retirer quand Flet n'embarquera plus cette dépendance pour le bureau |
