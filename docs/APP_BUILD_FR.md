@@ -4,12 +4,21 @@ Ce document est la procédure. La conception — pourquoi Flet, pourquoi pas de
 boucle sur téléphone, le modèle de données — est dans
 [`APP_PC_APK_FR.md`](APP_PC_APK_FR.md).
 
-> **Ce qui n'a pas été vérifié ici.** Les builds n'ont pas tourné dans le
-> conteneur qui a écrit ce code : il n'a ni Flutter, ni Android SDK, ni JDK 17,
-> et la politique réseau n'autorise pas leur téléchargement. La configuration,
-> le workflow et cette procédure sont livrés ; le premier APK sort de CI, et la
-> checklist d'appareil (§11 du document de conception) reste à faire une fois
-> le fichier en main.
+> **Où en sont les builds.** Les trois cibles sortent de CI, vérifiées le
+> 23/10/2026 sur le run 39994518717 :
+>
+> | Cible | Poids |
+> |---|---|
+> | APK `arm64-v8a` | 25,8 Mio |
+> | Linux | 33,2 Mio |
+> | Windows | 37,0 Mio |
+>
+> Les 25,8 Mio de l'APK confirment le pari de départ : un moteur en Python pur
+> tient sous les 30 Mo, là où pandas et numpy en auraient coûté 55 de plus.
+>
+> Rien n'a été construit dans le conteneur qui a écrit ce code — il n'a ni
+> Flutter, ni Android SDK, ni JDK 17 — et **l'application n'a jamais tourné sur
+> un appareil**. La checklist du §11 du document de conception reste entière.
 
 ---
 
