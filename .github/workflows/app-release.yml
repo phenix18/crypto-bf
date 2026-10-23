@@ -24,7 +24,9 @@ on:
 
 concurrency:
   group: app-release-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a running release build: a second dispatch would kill an APK
+  # that is ten minutes into Gradle, and the one you wanted is the one you lose.
+  cancel-in-progress: false
 
 env:
   # flet 0.86.5 asks for this exact Flutter minor; it refuses to build on
@@ -127,7 +129,12 @@ jobs:
               --android-signing-key-alias "${KEY_ALIAS:-aitrader}"
             )
           fi
-          flet build apk "${args[@]}"
+          set -o pipefail
+          flet build apk "${args[@]}" 2>&1 | tee build.log || {
+            # The signing arguments are never echoed: only flet's own output.
+            tail -n 30 build.log | while IFS= read -r ligne; do echo "::error::$ligne"; done
+            exit 1
+          }
 
       - name: Report what came out
         working-directory: app
@@ -205,7 +212,14 @@ jobs:
 
       - name: Build
         working-directory: app
-        run: flet build ${{ matrix.cible }} --build-number ${{ github.run_number }} --no-rich-output --yes
+        shell: bash
+        run: |
+          set -o pipefail
+          flet build ${{ matrix.cible }} --build-number ${{ github.run_number }} \
+            --no-rich-output --yes 2>&1 | tee build.log || {
+            tail -n 30 build.log | while IFS= read -r ligne; do echo "::error::$ligne"; done
+            exit 1
+          }
 
       - uses: actions/upload-artifact@v4
         with:
