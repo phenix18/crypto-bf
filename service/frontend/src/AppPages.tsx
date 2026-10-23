@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
+import { pick } from './i18n'
+
 import {
   AgentName,
   API_BASE,
@@ -2294,7 +2296,7 @@ export function LeaderboardPage({ token }: { token?: string | null }) {
         {profitHistory.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">🏆</div>
-            <div className="empty-title">{language === 'zh' ? '暂无数据' : 'No data yet'}</div>
+            <div className="empty-title">{pick(language, { zh: '暂无数据', en: 'No data yet', fr: 'Aucune donnée pour le moment' })}</div>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
@@ -2988,7 +2990,7 @@ export function TrendingSidebar() {
       <div className="card" style={{ padding: '16px', marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-            {language === 'zh' ? '在线交易员' : 'Online Traders'}
+            {pick(language, { zh: '在线交易员', en: 'Online Traders', fr: 'Traders en ligne' })}
           </span>
           <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--accent-primary)' }}>
             {agentCount}
@@ -2998,12 +3000,12 @@ export function TrendingSidebar() {
 
       <div className="card" style={{ padding: '16px' }}>
         <h3 style={{ fontSize: '14px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          🔥 {language === 'zh' ? '热门标的' : 'Trending'}
+          🔥 {pick(language, { zh: '热门标的', en: 'Trending', fr: 'Tendances' })}
         </h3>
 
         {trending.length === 0 ? (
           <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>
-            {language === 'zh' ? '暂无数据' : 'No data'}
+            {pick(language, { zh: '暂无数据', en: 'No data', fr: 'Aucune donnée' })}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

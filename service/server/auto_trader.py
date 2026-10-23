@@ -254,6 +254,24 @@ class Portfolio:
 # ------------------------------------------------------------------- decision --
 
 
+# Every stage a decision can stop at. The interface carries a label for each
+# one (service/frontend/src/autotraderLabels.ts), so adding a stage here
+# without adding its label there leaves the screen showing a raw English word
+# to a reader who chose another language. A test on each side pins the list.
+STAGES: tuple[str, ...] = (
+    "strategy",
+    "risk",
+    "calibration",
+    "council",
+    "approved",
+    "executed",
+    "execution",
+    "position",
+    "bar",
+    "error",
+)
+
+
 @dataclass(frozen=True)
 class Decision:
     """Everything that went into one verdict, for the UI and the audit trail."""

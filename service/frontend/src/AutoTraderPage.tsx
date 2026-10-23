@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { API_BASE, useLanguage } from './appShared'
+import { LABELS, hasCouncil, stageLabel } from './autotraderLabels'
 import { type ChartPayload, drawChart } from './autotraderChart'
 import './autotrader.css'
 
@@ -67,67 +68,6 @@ type Decision = {
   orders: { side: string; status: string; quantity: number; average_price: number | null }[]
 }
 
-const LABELS = {
-  zh: {
-    title: '自动交易台',
-    subtitle: '策略 → 风控 → 校准 → 多智能体评议 → 下单',
-    analyse: '分析',
-    trade: '下单',
-    killOn: '启用熔断',
-    killOff: '解除熔断',
-    confluence: '共振度',
-    participation: '参与度',
-    regime: '市场状态',
-    riskReward: '盈亏比',
-    stage: '停在',
-    council: '智能体评议',
-    conviction: '信心',
-    votes: '指标投票',
-    readings: '指标读数',
-    balance: '账户',
-    equity: '净值',
-    pnl: '总盈亏',
-    today: '今日已实现',
-    drawdown: '回撤',
-    positions: '持仓',
-    close: '平仓',
-    audit: '审计日志',
-    noPositions: '暂无持仓',
-    disarmed: '自动交易未启用：设置 AUTO_TRADE_ENABLED=true 后才会真正下单',
-    demo: '演示数据源，非真实行情',
-    nothing: '本根K线没有可交易的形态',
-  },
-  en: {
-    title: 'Auto-trading desk',
-    subtitle: 'strategy → risk → calibration → agent council → orders',
-    analyse: 'Analyse',
-    trade: 'Place order',
-    killOn: 'Engage kill switch',
-    killOff: 'Release kill switch',
-    confluence: 'Confluence',
-    participation: 'Participation',
-    regime: 'Regime',
-    riskReward: 'Reward / risk',
-    stage: 'Stopped at',
-    council: 'Agent council',
-    conviction: 'Conviction',
-    votes: 'Indicator votes',
-    readings: 'Readings',
-    balance: 'Account',
-    equity: 'Equity',
-    pnl: 'Total P&L',
-    today: 'Realised today',
-    drawdown: 'Drawdown',
-    positions: 'Open positions',
-    close: 'Close',
-    audit: 'Audit trail',
-    noPositions: 'Nothing open',
-    disarmed: 'Auto-trading is off: set AUTO_TRADE_ENABLED=true before orders can be placed',
-    demo: 'Demonstration feed, not a live market',
-    nothing: 'Nothing tradable on this bar',
-  },
-}
-
 function money(value: number | null | undefined, digits = 2): string {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '—'
   return value.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })
@@ -178,7 +118,7 @@ function ConfluenceGauge({ value, gate, label }: { value: number; gate: number; 
 
 export function AutoTraderPage() {
   const { language } = useLanguage()
-  const L = language === 'zh' ? LABELS.zh : LABELS.en
+  const L = LABELS[language] ?? LABELS.en
 
   const [status, setStatus] = useState<Status | null>(null)
   const [chart, setChart] = useState<ChartPayload | null>(null)
@@ -286,7 +226,7 @@ export function AutoTraderPage() {
   const proposal = decision?.proposal || chart?.proposal
   const mode = status?.mode
   const portfolio = status?.portfolio
-  const council = decision?.council
+  const council = hasCouncil(decision?.council) ? decision?.council : null
 
   const directionTone = useMemo(() => {
     if (!proposal || proposal.direction === 'flat') return 'flat'
@@ -416,7 +356,9 @@ export function AutoTraderPage() {
               {decision && (
                 <div>
                   <dt>{L.stage}</dt>
-                  <dd className={`at-stage at-stage--${decision.stage}`}>{decision.stage}</dd>
+                  <dd className={`at-stage at-stage--${decision.stage}`}>
+                    {stageLabel(decision.stage, language)}
+                  </dd>
                 </div>
               )}
             </dl>
@@ -437,7 +379,7 @@ export function AutoTraderPage() {
               <div className="at-card-head">
                 <h2>{L.council}</h2>
                 <span className="at-conviction">
-                  {L.conviction} {(council.conviction * 100).toFixed(0)}%
+                  {L.conviction} {((council.conviction ?? 0) * 100).toFixed(0)}%
                 </span>
               </div>
               <ul className="at-council">
@@ -559,7 +501,9 @@ export function AutoTraderPage() {
                 <span className="at-audit-kind">{String(entry.kind ?? '')}</span>
                 <span>{String(entry.symbol ?? '')}</span>
                 <span className={`at-stage at-stage--${String(entry.stage ?? '')}`}>
-                  {String(entry.stage ?? entry.outcome ?? '')}
+                  {entry.stage
+                    ? stageLabel(String(entry.stage), language)
+                    : String(entry.outcome ?? '')}
                 </span>
                 <small>{Array.isArray(entry.reasons) ? String(entry.reasons[0] ?? '') : ''}</small>
               </li>

@@ -591,3 +591,64 @@ class BuildTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StageContractTests(unittest.TestCase):
+    """The list of stages, pinned on both sides of the HTTP boundary.
+
+    The interface has a label per stage. Adding one here without adding it
+    there leaves a reader who chose French or Chinese looking at a raw English
+    word, and nothing fails to build.
+    """
+
+    def source(self) -> str:
+        import auto_trader
+
+        return open(auto_trader.__file__, encoding="utf-8").read()
+
+    def emitted_stages(self) -> set:
+        """Every stage literal in the module, however it is written.
+
+        Three spellings, because the scan missed one the first time it ran and
+        a scan that silently misses a case is worse than no scan: the keyword
+        argument, the branches of the ternary that picks between council and
+        approved, and the two refusals that pass the stage positionally.
+        """
+        import re
+
+        text = self.source()
+        found = set(re.findall(r'stage="([a-z]+)"', text))
+        for line in text.splitlines():
+            if "stage=" in line:
+                found.update(re.findall(r'else "([a-z]+)"', line))
+        found.update(re.findall(r'now, "([a-z]+)", \[', text))
+        return found
+
+    def test_every_stage_the_code_emits_is_declared(self):
+        from auto_trader import STAGES
+
+        missing = self.emitted_stages() - set(STAGES)
+        self.assertEqual(missing, set(), f"undeclared stages: {sorted(missing)}")
+
+    def test_no_declared_stage_has_gone_stale(self):
+        from auto_trader import STAGES
+
+        unused = set(STAGES) - self.emitted_stages()
+        self.assertEqual(unused, set(), f"declared but never emitted: {sorted(unused)}")
+
+    def test_the_scan_actually_finds_something(self):
+        # Guard against the two tests above passing because the regex matched
+        # nothing at all.
+        self.assertGreaterEqual(len(self.emitted_stages()), 8)
+
+    def test_a_real_decision_reports_a_declared_stage(self):
+        from auto_trader import STAGES
+
+        bot = trader()
+        for decision in (
+            bot.evaluate("BTCUSDT", "5m", now=NOW),
+            bot.trade("BTCUSDT", "5m", now=NOW),
+            bot.trade("BTCUSDT", "5m", now=NOW),
+        ):
+            with self.subTest(stage=decision.stage):
+                self.assertIn(decision.stage, STAGES)

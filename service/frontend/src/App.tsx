@@ -31,7 +31,7 @@ import { ChallengePage } from './ChallengePage'
 import { ExperimentAdminPage } from './ExperimentAdminPage'
 import { ResearchExportsPage } from './ResearchExportsPage'
 import { TeamMissionsPage } from './TeamMissionsPage'
-import { Language, getT } from './i18n'
+import { Language, getT, isLanguage } from './i18n'
 import { hasPermission } from './appShared'
 
 const DISCUSSION_NOTIFICATION_TYPES = new Set([
@@ -60,7 +60,12 @@ const EXPERIMENT_NOTIFICATION_TYPES = new Set([
 
 
 function App() {
-  const [language, setLanguage] = useState<Language>('zh')
+  const [language, setLanguage] = useState<Language>(() => {
+    // Remembered like the theme. Without this a French reader picked their
+    // language and got Chinese back on every reload.
+    const saved = localStorage.getItem('ai_trader_language')
+    return isLanguage(saved) ? saved : 'zh'
+  })
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const savedTheme = localStorage.getItem('ai_trader_theme')
     return savedTheme === 'light' ? 'light' : 'dark'
@@ -91,6 +96,13 @@ function App() {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('ai_trader_theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    // `lang` on the root element is what a screen reader and the browser's own
+    // translation prompt read, so it has to follow the choice too.
+    document.documentElement.lang = language
+    localStorage.setItem('ai_trader_language', language)
+  }, [language])
 
   const fetchAgentInfo = async () => {
     if (!token) return
