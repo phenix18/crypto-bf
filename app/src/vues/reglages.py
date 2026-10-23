@@ -36,7 +36,12 @@ def _champ(libelle: str, controle: ft.Control, aide: str | None = None) -> ft.Co
 
 
 class Vue:
-    """Le formulaire, et l'écriture en base au moment de l'enregistrement."""
+    """Le formulaire, et l'écriture en base au moment de l'enregistrement.
+
+    Nommée `Vue` et non `Reglages` : ce module importe déjà
+    `coeur.config.Reglages`, qui est la donnée. Deux `Reglages` dans un même
+    fichier, l'un dataclass et l'autre écran, se confondraient à la lecture.
+    """
 
     def __init__(self, session, page: ft.Page, sur_changement=None):
         self.session = session

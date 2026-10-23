@@ -23,6 +23,13 @@ copyright = "AI-Trader"
 [tool.flet.app]
 path = "src"
 
+# Les couleurs du fond de l'écran d'accueil, derrière src/assets/splash*.png.
+# Sans elles, Flutter met du blanc : un éclair blanc avant une interface
+# sombre, sur un téléphone réglé en sombre.
+[tool.flet.splash]
+color = "#f4f1ea"
+dark_color = "#070b10"
+
 [tool.flet.android]
 split_per_abi = true
 
