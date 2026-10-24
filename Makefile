@@ -9,7 +9,7 @@ BASE_URL ?= http://127.0.0.1:$(API_PORT)
 
 .DEFAULT_GOAL := help
 .PHONY: help bootstrap install test test-frontend test-app test-all api worker frontend build dev smoke clean \
-        app-run app-icons app-apk app-desktop \
+        app-run app-icons app-apk app-desktop simulation \
         docker-up docker-down docker-logs require-venv require-npm require-npm-binary require-docker require-flet
 
 help: ## Show this help
@@ -93,6 +93,9 @@ test-app: require-venv ## Run the PC/Android application tests
 	cd app && ../$(PY) -m pytest tests -q
 
 test-all: test test-app test-frontend ## Run every suite
+
+simulation: require-venv ## Replay history through the whole pipeline and report
+	$(PY) scripts/simulation.py
 
 # ------------------------------------------------- PC/Android application ----
 # `flet build` needs a Flutter SDK (3.44.8 for flet 0.86.5), and the APK also

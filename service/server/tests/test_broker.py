@@ -233,6 +233,29 @@ class PaperBrokerTests(unittest.TestCase):
         )
         self.assertAlmostEqual(broker.balance("USDT"), 800.0)
 
+    def test_a_recorded_exit_gives_the_cash_back(self):
+        # Paper's protective orders never fill on their own; settle() reads the
+        # bar and tells the broker here. Without it the cash only ever went out.
+        broker = self.broker()
+        broker.place_market_entry(
+            symbol="BTCUSDT", side=Side.BUY, quantity=2.0, client_order_id="a"
+        )
+        broker.record_exit_fill(
+            symbol="BTCUSDT", side=Side.SELL, quantity=2.0, price=110.0
+        )
+        self.assertAlmostEqual(broker.balance("USDT"), 1020.0)
+
+    def test_a_recorded_exit_on_a_short_spends(self):
+        broker = self.broker()
+        broker.place_market_entry(
+            symbol="BTCUSDT", side=Side.SELL, quantity=2.0, client_order_id="a"
+        )
+        self.assertAlmostEqual(broker.balance("USDT"), 1200.0)
+        broker.record_exit_fill(
+            symbol="BTCUSDT", side=Side.BUY, quantity=2.0, price=90.0
+        )
+        self.assertAlmostEqual(broker.balance("USDT"), 1020.0)
+
     def test_an_order_larger_than_the_balance_is_refused(self):
         with self.assertRaises(BrokerError):
             self.broker().place_market_entry(

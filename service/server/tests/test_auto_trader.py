@@ -453,6 +453,55 @@ class SettleTests(unittest.TestCase):
         self.assertEqual(closed[0].outcome, Outcome.WIN)
         self.assertGreater(closed[0].r_multiple, 1.0)
 
+    def test_a_settled_exit_gives_the_paper_cash_back(self):
+        # The paper broker's protective orders never fill on their own: it is
+        # settle() that reads the bar and decides. Without telling the broker,
+        # the entry debited its cash and the exit never returned it — after a
+        # few trades the balance could no longer fund one, and the loop looked
+        # like it had stopped finding setups when it had run out of play money.
+        bot = trader()
+        avant = bot.broker.quote_balance
+        bot, held = self.open_a_trade(bot)
+        self.assertLess(bot.broker.quote_balance, avant, "l'entrée doit débiter")
+        bar = Candle(
+            open_time=held.bar_open_time + 300_000,
+            open=held.entry,
+            high=held.take_profit + 0.5,
+            low=held.entry,
+            close=held.take_profit,
+            volume=1.0,
+        )
+        bot.settle("BTCUSDT", "5m", [bar], now=NOW)
+        gain = held.quantity * (held.take_profit - held.entry)
+        self.assertAlmostEqual(bot.broker.quote_balance, avant + gain, places=6)
+
+    def test_a_hand_exit_gives_the_paper_cash_back_too(self):
+        bot, held = self.open_a_trade()
+        avant = bot.broker.quote_balance
+        bot.close_now("BTCUSDT", held.entry, now=NOW)
+        self.assertAlmostEqual(
+            bot.broker.quote_balance, avant + held.quantity * held.entry, places=6
+        )
+
+    def test_a_settled_loss_costs_the_paper_balance_only_the_loss(self):
+        # The invariant that keeps a long run alive: a round trip moves the
+        # cash by the trade's result, never by the whole position's notional.
+        bot = trader()
+        avant = bot.broker.quote_balance
+        bot, held = self.open_a_trade(bot)
+        bar = Candle(
+            open_time=held.bar_open_time + 300_000,
+            open=held.entry,
+            high=held.entry,
+            low=held.stop_loss - 0.5,
+            close=held.stop_loss,
+            volume=1.0,
+        )
+        bot.settle("BTCUSDT", "5m", [bar], now=NOW)
+        perte = held.quantity * (held.entry - held.stop_loss)
+        self.assertAlmostEqual(bot.broker.quote_balance, avant - perte, places=6)
+        self.assertAlmostEqual(bot.broker.quote_balance, bot.portfolio.equity, places=6)
+
     def test_a_bar_that_covers_both_levels_is_scored_as_the_loss(self):
         # The bar does not say which came first. Assuming the good one is how
         # a backtest, and then the calibration layer reading it, goes

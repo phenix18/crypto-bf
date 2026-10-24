@@ -644,7 +644,7 @@ class AutoTrader:
                 continue
             exit_price = position.stop_loss if hit_stop else position.take_profit
             reason = "stop" if hit_stop else "target"
-            self.broker.cancel_all(symbol)
+            self._book_exit(position, exit_price)
             trade = self.portfolio.close(
                 position, exit_price=exit_price, now=now, reason=reason, config=self.risk_config
             )
@@ -655,13 +655,30 @@ class AutoTrader:
             break
         return closed
 
+    def _book_exit(self, position: Position, exit_price: float) -> None:
+        """Annule les ordres de protection et fait constater la sortie au courtier.
+
+        Les deux vont ensemble. La place tient son propre solde et n'a rien à
+        constater ; le courtier papier, lui, ne voit jamais ses ordres de
+        protection s'exécuter — sans ce rappel, l'entrée débite sa trésorerie
+        et la sortie ne la rend pas.
+        """
+        self.broker.cancel_all(position.symbol)
+        exit_side = Side.SELL if position.direction == "long" else Side.BUY
+        self.broker.record_exit_fill(
+            symbol=position.symbol,
+            side=exit_side,
+            quantity=position.quantity,
+            price=exit_price,
+        )
+
     def close_now(self, symbol: str, price: float, *, now: Optional[datetime] = None) -> Optional[ClosedTrade]:
         """Flatten a position at a given price. For the kill switch and for hand exits."""
         now = now or self.clock()
         position = self.portfolio.positions.get(symbol.upper())
         if position is None:
             return None
-        self.broker.cancel_all(symbol.upper())
+        self._book_exit(position, price)
         trade = self.portfolio.close(
             position, exit_price=price, now=now, reason="manual", config=self.risk_config
         )

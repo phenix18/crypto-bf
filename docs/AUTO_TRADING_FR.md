@@ -139,7 +139,33 @@ Tous documentés dans `.env.example`. Les plus utiles :
 
 ---
 
-## 7. Ce qui n'est pas fait
+## 7. Rejouer un historique
+
+```bash
+make simulation                              # 3 000 bougies × 3 symboles
+python scripts/simulation.py --graine 11     # un autre tirage
+python scripts/simulation.py --derive 0      # du bruit sans tendance
+```
+
+Le script passe par `AutoTrader.trade()`, donc par le code de production, et
+imprime où les analyses se sont arrêtées, ce que le conseil a dit, les trades,
+le capital et l'état des paquets de calibration.
+
+**Lisez-le pour la mécanique, pas pour la rentabilité.** Mesuré le 24/10/2026
+sur trois graines : environ 1 % des analyses aboutissent à un trade, et
+l'espérance ressort à +0,3 R. Mais avec `--derive 0`, la même configuration
+tombe à **−0,23 R par trade**. Le résultat positif par défaut mesure la dérive
+du générateur, pas un avantage : les sorties se font à +1,67 R contre −1,00 R,
+il faudrait donc 37 % de réussite pour être à l'équilibre sur une marche sans
+dérive, et la simulation en relève 29 %.
+
+Ce que la simulation prouve vraiment : les portails refusent, les positions se
+dénouent, les R se calculent, et un paquet de calibration qui atteint 30 trades
+tranchés avec 39 % de réussite se ferme bien tout seul. C'est le sujet.
+
+---
+
+## 8. Ce qui n'est pas fait
 
 À savoir avant de compter dessus :
 

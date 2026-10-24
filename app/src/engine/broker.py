@@ -218,6 +218,10 @@ class Broker(Protocol):
 
     def cancel_all(self, symbol: str) -> None: ...
 
+    def record_exit_fill(
+        self, *, symbol: str, side: Side, quantity: float, price: float
+    ) -> None: ...
+
 
 # ---------------------------------------------------------------------- paper --
 
@@ -317,6 +321,24 @@ class PaperBroker:
 
     def cancel_all(self, symbol: str) -> None:
         self.protective = [o for o in self.protective if o.symbol != symbol.upper()]
+
+    def record_exit_fill(
+        self, *, symbol: str, side: Side, quantity: float, price: float
+    ) -> None:
+        """Encaisse une sortie dénouée ailleurs que par un ordre au marché.
+
+        Ici, les ordres de protection ne s'exécutent pas tout seuls : c'est
+        `AutoTrader.settle` qui constate, sur les bougies, que le stop ou la
+        cible a été touché. Sans ce rappel, l'entrée débitait la trésorerie et
+        la sortie ne la rendait jamais — le solde descendait à chaque position
+        jusqu'à ne plus pouvoir en financer aucune, et le robot avait l'air de
+        ne plus trouver de signal alors qu'il n'avait plus d'argent fictif.
+        """
+        notional = quantity * price
+        if side is Side.SELL:
+            self.quote_balance += notional
+        else:
+            self.quote_balance -= notional
 
 
 # -------------------------------------------------------------------- binance --
@@ -551,6 +573,16 @@ class BinanceSpotBroker:
 
     def cancel_all(self, symbol: str) -> None:
         self._signed_request("DELETE", "/api/v3/openOrders", {"symbol": symbol.upper()})
+
+    def record_exit_fill(
+        self, *, symbol: str, side: Side, quantity: float, price: float
+    ) -> None:
+        """Rien à faire : la place a déjà exécuté l'ordre de protection.
+
+        C'est elle qui tient le solde. Le constater une seconde fois ici
+        compterait la sortie deux fois.
+        """
+        return None
 
 
 def _beyond(stop_price: float, side: Side, tick: float) -> float:
