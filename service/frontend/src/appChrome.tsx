@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 
 import { AgentName, type AgentInfo, hasPermission, isVerifiedAgent, useLanguage, useTheme } from './appShared'
+import { LANGUAGES, LANGUAGE_NAMES, pick } from './i18n'
 
 export function Toast({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) {
   useEffect(() => {
@@ -22,22 +23,21 @@ export type NotificationCounts = {
 function LanguageSwitcher() {
   const { language, setLanguage } = useLanguage()
 
+  // Driven by the language list, so adding a locale adds its button. The
+  // hand-written version was how a language could ship with no way to pick it.
   return (
     <div className="control-pill-group">
-      <button
-        type="button"
-        onClick={() => setLanguage('zh')}
-        className={`control-pill ${language === 'zh' ? 'active' : ''}`}
-      >
-        中文
-      </button>
-      <button
-        type="button"
-        onClick={() => setLanguage('en')}
-        className={`control-pill ${language === 'en' ? 'active' : ''}`}
-      >
-        EN
-      </button>
+      {LANGUAGES.map((code) => (
+        <button
+          key={code}
+          type="button"
+          onClick={() => setLanguage(code)}
+          className={`control-pill ${language === code ? 'active' : ''}`}
+          aria-pressed={language === code}
+        >
+          {LANGUAGE_NAMES[code]}
+        </button>
+      ))}
     </div>
   )
 }
@@ -91,14 +91,15 @@ export function Sidebar({
   const agentToken = agentInfo?.token
 
   const navItems = [
-    { path: '/financial-events', icon: '🗞️', label: language === 'zh' ? '金融事件看板' : 'Financial Events', requiresAuth: false },
+    { path: '/auto', icon: '⚡', label: pick(language, { zh: '自动交易台', en: 'Auto-Trader', fr: 'Poste auto' }), requiresAuth: false },
+    { path: '/financial-events', icon: '🗞️', label: pick(language, { zh: '金融事件看板', en: 'Financial Events', fr: 'Événements financiers' }), requiresAuth: false },
     { path: '/market', icon: '📊', label: t.nav.signals, requiresAuth: false },
-    { path: '/leaderboard', icon: '🏆', label: language === 'zh' ? '排行榜' : 'Leaderboard', requiresAuth: false },
-    { path: '/challenges', icon: '⚔️', label: language === 'zh' ? '挑战赛' : 'Challenges', requiresAuth: false },
-    ...(canUseTeamMissionAdmin ? [{ path: '/team-missions', icon: '▦', label: language === 'zh' ? '团队任务' : 'Team Missions', requiresAuth: true }] : []),
-    ...(canUseExperiments ? [{ path: '/experiments', icon: '◇', label: language === 'zh' ? '实验' : 'Experiments', requiresAuth: true, badge: notificationCounts.experiment, category: 'experiment' as const }] : []),
-    ...(canUseResearchExports ? [{ path: '/research-exports', icon: '⇩', label: language === 'zh' ? '研究导出' : 'Research Exports', requiresAuth: true }] : []),
-    { path: '/copytrading', icon: '📋', label: language === 'zh' ? '跟单' : 'Copy Trading', requiresAuth: true },
+    { path: '/leaderboard', icon: '🏆', label: pick(language, { zh: '排行榜', en: 'Leaderboard', fr: 'Classement' }), requiresAuth: false },
+    { path: '/challenges', icon: '⚔️', label: pick(language, { zh: '挑战赛', en: 'Challenges', fr: 'Défis' }), requiresAuth: false },
+    ...(canUseTeamMissionAdmin ? [{ path: '/team-missions', icon: '▦', label: pick(language, { zh: '团队任务', en: 'Team Missions', fr: 'Missions d\'équipe' }), requiresAuth: true }] : []),
+    ...(canUseExperiments ? [{ path: '/experiments', icon: '◇', label: pick(language, { zh: '实验', en: 'Experiments', fr: 'Expériences' }), requiresAuth: true, badge: notificationCounts.experiment, category: 'experiment' as const }] : []),
+    ...(canUseResearchExports ? [{ path: '/research-exports', icon: '⇩', label: pick(language, { zh: '研究导出', en: 'Research Exports', fr: 'Exports de recherche' }), requiresAuth: true }] : []),
+    { path: '/copytrading', icon: '📋', label: pick(language, { zh: '跟单', en: 'Copy Trading', fr: 'Copy trading' }), requiresAuth: true },
     { path: '/strategies', icon: '📈', label: t.nav.strategies, requiresAuth: false, badge: notificationCounts.strategy, category: 'strategy' as const },
     { path: '/discussions', icon: '💬', label: t.nav.discussions, requiresAuth: false, badge: notificationCounts.discussion, category: 'discussion' as const },
     { path: '/positions', icon: '💼', label: t.nav.positions, requiresAuth: false },
@@ -236,19 +237,21 @@ export function Sidebar({
           <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
               <div style={{ fontWeight: 600, marginBottom: '6px' }}>
-                {language === 'zh' ? '游客模式' : 'Guest Mode'}
+                {pick(language, { zh: '游客模式', en: 'Guest Mode', fr: 'Mode visiteur' })}
               </div>
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                {language === 'zh'
-                  ? '现在可以直接查看交易市场、排行榜、策略和讨论。登录后可交易、跟单和兑换积分。'
-                  : 'You can browse markets, leaderboard, strategies, and discussions now. Login to trade, copy, and exchange points.'}
+                {pick(language, {
+                  zh: '现在可以直接查看交易市场、排行榜、策略和讨论。登录后可交易、跟单和兑换积分。',
+                  en: 'You can browse markets, leaderboard, strategies, and discussions now. Login to trade, copy, and exchange points.',
+                  fr: 'Vous pouvez consulter les marchés, le classement, les stratégies et les discussions. Connectez-vous pour trader, copier et échanger vos points.',
+                })}
               </div>
             </div>
             <Link to="/login" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-              {language === 'zh' ? '登录 / 注册' : 'Login / Register'}
+              {pick(language, { zh: '登录 / 注册', en: 'Login / Register', fr: 'Connexion / Inscription' })}
             </Link>
             <Link to="/market" className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}>
-              {language === 'zh' ? '先看看市场' : 'Browse Market'}
+              {pick(language, { zh: '先看看市场', en: 'Browse Market', fr: 'Voir les marchés' })}
             </Link>
           </div>
         )}

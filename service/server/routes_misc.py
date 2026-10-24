@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response
 
 
@@ -26,6 +26,27 @@ def _resolve_skill_path(skill_name: Optional[str] = None):
 
 
 def register_misc_routes(app: FastAPI) -> None:
+    @app.get('/api/health')
+    async def health_check():
+        """Liveness/readiness probe used by containers and uptime monitors."""
+        from cache import get_cache_status
+        from database import get_database_status
+
+        db_status = get_database_status()
+        cache_status = get_cache_status()
+        healthy = bool(db_status.get('backend'))
+        payload = {
+            'status': 'ok' if healthy else 'degraded',
+            'database': db_status,
+            'cache': {
+                'enabled': cache_status.get('enabled'),
+                'available': cache_status.get('available'),
+            },
+        }
+        if not healthy:
+            raise HTTPException(status_code=503, detail=payload)
+        return payload
+
     @app.get('/skill.md')
     @app.get('/SKILL.md')
     async def get_skill_index():
@@ -64,6 +85,10 @@ def register_misc_routes(app: FastAPI) -> None:
 
     @app.get('/{path:path}')
     async def serve_spa_fallback(path: str):
+        # The SPA fallback must not swallow unknown API paths: a client calling a
+        # route that does not exist has to see a 404, not a 200 HTML page.
+        if path == 'api' or path.startswith('api/'):
+            raise HTTPException(status_code=404, detail='Not Found')
         index_path = Path(__file__).parent.parent / 'frontend' / 'dist' / 'index.html'
         if index_path.exists():
             return FileResponse(index_path)

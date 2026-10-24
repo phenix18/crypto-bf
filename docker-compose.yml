@@ -1,0 +1,75 @@
+# Full AI-Trader stack: PostgreSQL, Redis, the API, and the background worker.
+#
+#   make docker-up      build and start everything
+#   make docker-logs    follow the logs
+#   make docker-down    stop it
+#
+# The API serves the built SPA at http://localhost:8000 and the JSON API under
+# /api. Override any setting through a .env file next to this one.
+
+x-app: &app
+  build:
+    context: .
+    dockerfile: Dockerfile
+  environment:
+    ENVIRONMENT: ${ENVIRONMENT:-development}
+    DATABASE_URL: postgresql://${POSTGRES_USER:-ai_trader}:${POSTGRES_PASSWORD:-ai_trader}@postgres:5432/${POSTGRES_DB:-ai_trader}
+    REDIS_ENABLED: "true"
+    REDIS_URL: redis://redis:6379/0
+    ALPHA_VANTAGE_API_KEY: ${ALPHA_VANTAGE_API_KEY:-demo}
+    ADANOS_API_KEY: ${ADANOS_API_KEY:-}
+    CLAWTRADER_CORS_ORIGINS: ${CLAWTRADER_CORS_ORIGINS:-http://localhost:8000,http://localhost:3000}
+    API_STDERR_LOG: "true"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ai_trader}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ai_trader}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_trader}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai_trader} -d ${POSTGRES_DB:-ai_trader}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "no"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    <<: *app
+    ports:
+      - "${API_PORT:-8000}:8000"
+    command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  # Background jobs run in their own process so HTTP stays responsive while
+  # prices, profit history, settlements, and market intel are refreshed.
+  # The worker takes a singleton lock in Redis, so do not scale it past 1.
+  worker:
+    <<: *app
+    command: ["python", "worker.py"]
+    healthcheck:
+      disable: true
+
+volumes:
+  postgres-data:
+  redis-data:

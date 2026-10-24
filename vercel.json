@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm ci --prefix service/frontend && npm run build --prefix service/frontend",
+  "outputDirectory": "service/frontend/dist",
+  "installCommand": "echo 'install handled by buildCommand'",
+  "framework": null,
+  "rewrites": [
+    { "source": "/((?!api/|assets/|SKILL.md|skill/).*)", "destination": "/index.html" }
+  ]
+}

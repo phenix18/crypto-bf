@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -169,19 +170,20 @@ class ExperimentEventRouteTests(unittest.TestCase):
         conn.commit()
         conn.close()
 
-        response = self.client.post(
-            "/api/signals/realtime",
-            headers={"Authorization": "Bearer token-author"},
-            json={
-                "market": "crypto",
-                "symbol": "BTC",
-                "action": "buy",
-                "quantity": 0.01,
-                "price": 100,
-                "content": "BTC copy attribution check.",
-                "executed_at": utc_now_iso_z(),
-            },
-        )
+        with patch("price_fetcher.get_price_from_market", return_value=100.0):
+            response = self.client.post(
+                "/api/signals/realtime",
+                headers={"Authorization": "Bearer token-author"},
+                json={
+                    "market": "crypto",
+                    "symbol": "BTC",
+                    "action": "buy",
+                    "quantity": 0.01,
+                    "price": 100,
+                    "content": "BTC copy attribution check.",
+                    "executed_at": utc_now_iso_z(),
+                },
+            )
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()["follower_count"], 1)
 
