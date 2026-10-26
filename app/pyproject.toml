@@ -1,9 +1,10 @@
 # Configuration de build Flet : un seul projet, deux cibles (PC et Android).
 #
 # La liste des dépendances tient en une ligne et doit y rester : le moteur de
-# trading n'utilise que la bibliothèque standard, et c'est ce qui fait tenir
-# l'APK sous ~30 Mo. Ajouter pandas ou numpy ici coûterait 55 Mo pour des
-# calculs que indicators.py sait déjà faire en Python pur.
+# trading n'utilise que la bibliothèque standard. L'APK pèse 52 Mo, dont 0,3
+# de notre code — le reste est le plancher de Flutter et de CPython. Ajouter
+# pandas ou numpy ici en coûterait 55 de plus, pour des calculs que
+# indicators.py sait déjà faire en Python pur.
 
 [project]
 name = "ai-trader-desk"

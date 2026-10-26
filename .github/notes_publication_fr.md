@@ -5,7 +5,7 @@
 | Windows | `…-windows-setup.exe` | double-cliquer ; s'installe sans droits administrateur |
 | Windows, sans installer | `…-windows-x64.zip` | décompresser où vous voulez, lancer l'exécutable |
 | Linux | `…-linux-x64.tar.gz` | `tar xzf …`, puis lancer l'exécutable (GTK 3 requis) |
-| Android | `…-release.apk` | autoriser les sources inconnues, ouvrir le fichier |
+| Android | `…-arm64-v8a.apk` | autoriser les sources inconnues, ouvrir le fichier |
 
 ## À savoir avant de l'ouvrir
 

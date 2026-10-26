@@ -28,9 +28,10 @@ Les neuf modules (`indicators`, `strategy_engine`, `risk_manager`,
 `json`, `os`, `time`, `hashlib`, `hmac`, `random`, `datetime` et `urllib` —
 plus eux-mêmes. Ni pandas, ni numpy, ni FastAPI.
 
-C'est le point qui rend l'APK raisonnable. Le piège habituel de cette pile,
-c'est pandas + numpy à 55 Mo ; ici le poids sera celui du moteur Flutter et de
-CPython, pas celui de l'application.
+C'est le point qui garde l'APK raisonnable. Le piège habituel de cette pile,
+c'est pandas + numpy à 55 Mo ; mesuré sur `app-v1.0.0`, le poids est bien
+celui du moteur Flutter et de CPython — 52 Mo — et celui de l'application est
+de 0,3 Mo.
 
 ### Ce qu'on écarte, et pourquoi
 
@@ -345,16 +346,21 @@ dependencies = [
 C'est tout. Le moteur n'a besoin de rien ; SQLite est dans la bibliothèque
 standard ; les appels HTTP passent par `urllib`.
 
-| Poste | Taille attendue |
+| Poste | Mesuré sur `app-v1.0.0` |
 |---|---|
-| Moteur Flutter + CPython embarqué | ~25–30 Mo |
-| Moteur de trading | 0,2 Mo |
-| Interface et ressources | ~1 Mo |
-| **APK (arm64-v8a)** | **~30 Mo** |
+| Interface Flutter compilée (`libapp.so`) | 13,9 Mo |
+| Moteur Flutter (`libflutter.so`) | 11,0 Mo |
+| CPython 3.14 et ses modules natifs | ~14,5 Mo |
+| Bibliothèque standard (`stdlib.zip`) | 4,0 Mo |
+| Dépendances Python (`sitepackages.zip`) | 1,8 Mo |
+| Moteur de trading et interface (`app.zip`) | 0,3 Mo |
+| **APK (arm64-v8a)** | **52,2 Mo** |
 
-À comparer aux 61 Mo de FidAnalyst, dont 55 de pandas/numpy. Ne pas ajouter
-pandas : tout ce dont l'application a besoin existe déjà en Python pur dans
-`indicators.py`.
+L'estimation initiale de ce tableau — ~30 Mo — était fausse de 20 Mo : elle
+comptait le moteur Flutter sans son code Dart compilé. À comparer tout de même
+aux 61 Mo de FidAnalyst, dont 55 de pandas/numpy : ces 55 Mo se seraient
+ajoutés à nos 52, pas substitués. Ne pas ajouter pandas — tout ce dont
+l'application a besoin existe déjà en Python pur dans `indicators.py`.
 
 ---
 

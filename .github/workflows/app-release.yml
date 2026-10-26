@@ -144,8 +144,9 @@ jobs:
         working-directory: app
         run: |
           ls -lh build/apk/
-          # An APK over ~45 MB means a native dependency slipped into the
-          # bundle; the engine itself is pure Python and weighs 176 KB.
+          # ~52 MB is the floor here: Flutter and CPython account for all of
+          # it, and app.zip — every line we wrote — is 0.3 MB of that. Over
+          # 60 MB means a native dependency slipped into sitepackages.zip.
           du -sh build/apk/*.apk
 
       # Note the labels rather than an empty string: in a GitHub expression

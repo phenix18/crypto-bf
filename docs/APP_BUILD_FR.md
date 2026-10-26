@@ -4,17 +4,34 @@ Ce document est la procédure. La conception — pourquoi Flet, pourquoi pas de
 boucle sur téléphone, le modèle de données — est dans
 [`APP_PC_APK_FR.md`](APP_PC_APK_FR.md).
 
-> **Où en sont les builds.** Les trois cibles sortent de CI, vérifiées le
-> 23/10/2026 sur le run 39994518717 :
+> **Où en sont les builds.** Les quatre livrables sortent de CI, mesurés le
+> 26/10/2026 sur la release [`app-v1.0.0`](https://github.com/phenix18/crypto-bf/releases/tag/app-v1.0.0)
+> (run 40249198072) :
 >
-> | Cible | Poids |
+> | Livrable | Poids |
 > |---|---|
-> | APK `arm64-v8a` | 25,8 Mio |
-> | Linux | 33,2 Mio |
-> | Windows | 37,0 Mio |
+> | APK `arm64-v8a` | 52,2 Mio |
+> | Installateur Windows | 26,8 Mio |
+> | Archive Windows | 36,4 Mio |
+> | Archive Linux | 31,9 Mio |
 >
-> Les 25,8 Mio de l'APK confirment le pari de départ : un moteur en Python pur
-> tient sous les 30 Mo, là où pandas et numpy en auraient coûté 55 de plus.
+> Les 52,2 Mio de l'APK corrigent un chiffre faux publié ici le 23/10 — 25,8 Mio
+> était la taille de l'**artefact compressé**, pas de l'APK. Le détail, mesuré
+> entrée par entrée :
+>
+> | Poste | Dans l'APK |
+> |---|---|
+> | `libapp.so` — l'interface Flutter compilée | 13,9 Mio |
+> | `libflutter.so` — le moteur Flutter | 11,0 Mio |
+> | CPython 3.14 et ses modules natifs | ~14,5 Mio |
+> | `stdlib.zip` | 4,0 Mio |
+> | `sitepackages.zip` | 1,8 Mio |
+> | **`app.zip` — tout notre code** | **0,3 Mio** |
+>
+> Le pari « moteur en Python pur » tient donc, mais pas sur le total : le
+> plancher de la pile est d'une cinquantaine de mégaoctets quoi qu'on écrive.
+> Ce qu'on a évité, ce sont les ~55 Mo que pandas et numpy auraient ajoutés
+> **à** ce plancher, dans `sitepackages.zip`.
 >
 > Rien n'a été construit dans le conteneur qui a écrit ce code — il n'a ni
 > Flutter, ni Android SDK, ni JDK 17 — et **l'application n'a jamais tourné sur
@@ -180,9 +197,11 @@ Trois choses à regarder :
 1. **le certificat** — le vôtre, pas celui de debug ;
 2. **les permissions** — `INTERNET` et `ACCESS_NETWORK_STATE`, et rien d'autre.
    Toute permission supplémentaire signale un plugin entré par la bande ;
-3. **le poids** — autour de 25 à 30 Mo. Au-delà de 45 Mo, une dépendance
-   native s'est glissée dans le paquet : le moteur, lui, est en Python pur et
-   pèse 176 Ko.
+3. **le poids** — autour de 52 Mo, dont 0,3 Mo de code applicatif. Le reste
+   est le plancher de la pile (Flutter + CPython), identique quoi qu'on
+   écrive. Au-delà de **60 Mo**, une dépendance native s'est glissée dans
+   `sitepackages.zip` : à vérifier avec
+   `unzip -l app.apk | grep sitepackages`.
 
 ---
 
@@ -233,5 +252,5 @@ lancement, analyse d'une paire réelle, rotation, mode sombre, coupure réseau.
 | L'APK s'installe mais remplace mal la précédente | `versionCode` non croissant, ou signature différente |
 | « Application non installée » sans autre message | APK signée avec une autre clé que celle déjà installée |
 | L'artefact s'appelle `…-UNSIGNED` | les secrets de signature ne sont pas en place (§3) |
-| L'APK dépasse 45 Mo | une dépendance native est entrée dans `pyproject.toml` |
+| L'APK dépasse 60 Mo | une dépendance native est entrée dans `pyproject.toml` ; les 52 Mo de base sont Flutter et CPython, pas l'application |
 | `JniVersionCheck` / `Constant evaluation error` | les liaisons générées par `jnigen` attendent `jni` 1.1 et la résolution en retient une plus ancienne. `app/pyproject.toml` épingle `jni = "1.1.0"`. Épingler le greffon fautif ne sert à rien : le suivant prend sa place |
