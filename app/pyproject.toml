@@ -1,0 +1,58 @@
+# Configuration de build Flet : un seul projet, deux cibles (PC et Android).
+#
+# La liste des dépendances tient en une ligne et doit y rester : le moteur de
+# trading n'utilise que la bibliothèque standard. L'APK pèse 52 Mo, dont 0,3
+# de notre code — le reste est le plancher de Flutter et de CPython. Ajouter
+# pandas ou numpy ici en coûterait 55 de plus, pour des calculs que
+# indicators.py sait déjà faire en Python pur.
+
+[project]
+name = "ai-trader-desk"
+version = "1.0.0"
+description = "Poste de trading automatique AI-Trader : analyse, supervision, coupe-circuit"
+requires-python = ">=3.12"
+dependencies = [
+  "flet==0.86.5",
+]
+
+[tool.flet]
+org = "com.aitrader"
+product = "AI-Trader"
+company = "AI-Trader"
+copyright = "AI-Trader"
+
+[tool.flet.app]
+path = "src"
+
+# Plusieurs greffons tirés par Flet embarquent des liaisons générées par
+# `jnigen`, qui commencent toutes par un contrôle de version :
+#
+#   const _$jniVersionCheck = jni$_.JniVersionCheck(1, 1);
+#   ERROR: Constant evaluation error
+#
+# Ce contrôle est une assertion constante dans `jni` : elle compare la version
+# attendue par les liaisons (1.1) à celle du paquet résolu. Elle n'échoue donc
+# que si la résolution retient un `jni` antérieur — un 0.x, dont la version
+# majeure vaut 0. Épingler les greffons un par un ne traite que le symptôme :
+# le premier épinglé laisse simplement la place au suivant.
+#
+# À retirer quand la résolution de Flet retiendra `jni` 1.1 d'elle-même.
+[tool.flet.flutter.pubspec.dependency_overrides]
+jni = "1.1.0"
+
+# Les couleurs du fond de l'écran d'accueil, derrière src/assets/splash*.png.
+# Sans elles, Flutter met du blanc : un éclair blanc avant une interface
+# sombre, sur un téléphone réglé en sombre.
+[tool.flet.splash]
+color = "#f4f1ea"
+dark_color = "#070b10"
+
+[tool.flet.android]
+split_per_abi = true
+
+# Deux permissions, pas une de plus. La base vit dans le dossier privé de
+# l'application et l'export passe par le partage Android, qui n'en demande
+# aucune.
+[tool.flet.android.permission]
+"android.permission.INTERNET" = true
+"android.permission.ACCESS_NETWORK_STATE" = true

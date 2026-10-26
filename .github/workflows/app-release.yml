@@ -1,0 +1,342 @@
+name: Application build (PC and Android)
+
+# Builds the Flet application. Separate from ci.yml on purpose: these jobs pull
+# a Flutter SDK and an Android toolchain, which is several minutes and has no
+# business running on every push.
+#
+# Run it from the Actions tab, or push a tag such as app-v1.0.0.
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: "Android versionCode (must increase with every release)"
+        required: false
+        default: ""
+      targets:
+        description: "What to build"
+        required: true
+        default: "apk"
+        type: choice
+        options: ["apk", "desktop", "all"]
+      release_tag:
+        description: "Tag to publish a GitHub release under (empty = artifacts only)"
+        required: false
+        default: ""
+  push:
+    tags: ["app-v*"]
+
+concurrency:
+  group: app-release-${{ github.ref }}
+  # Never cancel a running release build: a second dispatch would kill an APK
+  # that is ten minutes into Gradle, and the one you wanted is the one you lose.
+  cancel-in-progress: false
+
+env:
+  # flet 0.86.5 asks for this exact Flutter minor; it refuses to build on
+  # another one. `python -c "import flet.version"` prints the required value.
+  FLUTTER_VERSION: "3.44.8"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  apk:
+    name: Android APK
+    if: >-
+      github.event_name == 'push' ||
+      inputs.targets == 'apk' || inputs.targets == 'all'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      # pytest too: this job has no requirements.txt behind it, so nothing
+      # else brings it in and the test step would fail before the build.
+      - name: Install Flet and pytest
+        run: pip install "flet[cli]==0.86.5" pytest
+
+      # A packaged engine that has drifted from the server's would ship wrong
+      # decisions to a phone, where they are hardest to notice. Cheaper to fail
+      # here than to debug it on a device.
+      - name: Check the engine copy is in sync
+        run: python scripts/sync_engine.py --check
+
+      # The failing lines are echoed as annotations: a run's raw logs are not
+      # reachable from every tool, and "exit code 1" alone says nothing.
+      - name: Run the application tests
+        working-directory: app
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest tests -q 2>&1 | tee pytest.log || {
+            ../scripts/annoter_echec.sh pytest.log
+            exit 1
+          }
+
+      - name: Read the version
+        id: version
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import re, pathlib
+          texte = pathlib.Path("app/pyproject.toml").read_text(encoding="utf-8")
+          print("value=" + re.search(r'^version\s*=\s*"([^"]+)"', texte, re.M).group(1))
+          PY
+
+      # The keystore never touches the workspace: a file under app/ could be
+      # swept into an artifact or, worse, into a commit. RUNNER_TEMP is wiped
+      # with the runner.
+      - name: Unpack the signing key
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret: the APK will carry a debug signature and is for internal testing only."
+          fi
+
+      - name: Build the APK
+        working-directory: app
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -eu
+          args=(
+            --build-version "${{ steps.version.outputs.value }}"
+            --build-number "${{ inputs.build_number || github.run_number }}"
+            --arch arm64-v8a
+            --no-rich-output
+            --yes
+          )
+          if [ "${{ steps.signing.outputs.available }}" = "true" ]; then
+            args+=(
+              --android-signing-key-store "$RUNNER_TEMP/release.jks"
+              --android-signing-key-store-password "$KEYSTORE_PASSWORD"
+              --android-signing-key-password "${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
+              --android-signing-key-alias "${KEY_ALIAS:-aitrader}"
+            )
+          fi
+          set -o pipefail
+          # The signing arguments are never echoed: only flet's own output.
+          flet build apk "${args[@]}" 2>&1 | tee build.log || {
+            ../scripts/annoter_echec.sh build.log
+            exit 1
+          }
+
+      - name: Report what came out
+        working-directory: app
+        run: |
+          ls -lh build/apk/
+          # ~52 MB is the floor here: Flutter and CPython account for all of
+          # it, and app.zip — every line we wrote — is 0.3 MB of that. Over
+          # 60 MB means a native dependency slipped into sitepackages.zip.
+          du -sh build/apk/*.apk
+
+      # Note the labels rather than an empty string: in a GitHub expression
+      # `cond && '' || 'x'` always yields 'x', because an empty string is
+      # falsy. A signed build would have been labelled unsigned.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: >-
+            ai-trader-apk-${{ steps.version.outputs.value }}-${{
+            steps.signing.outputs.available == 'true' && 'signed' || 'UNSIGNED' }}
+          path: app/build/apk/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  desktop:
+    name: Desktop (${{ matrix.cible }})
+    if: >-
+      github.event_name == 'push' ||
+      inputs.targets == 'desktop' || inputs.targets == 'all'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            cible: linux
+          - os: windows-latest
+            cible: windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      # Flutter's Linux target compiles a GTK shell; these are its build
+      # dependencies, absent from the runner image.
+      - name: Install the Linux build dependencies
+        if: matrix.cible == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgtk-3-dev clang cmake pkg-config
+
+      - name: Read the version
+        id: version
+        shell: bash
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import re, pathlib
+          texte = pathlib.Path("app/pyproject.toml").read_text(encoding="utf-8")
+          print("value=" + re.search(r'^version\s*=\s*"([^"]+)"', texte, re.M).group(1))
+          PY
+
+      # pytest too: this job has no requirements.txt behind it, so nothing
+      # else brings it in and the test step would fail before the build.
+      - name: Install Flet and pytest
+        run: pip install "flet[cli]==0.86.5" pytest
+
+      - name: Check the engine copy is in sync
+        run: python scripts/sync_engine.py --check
+
+      # The failing lines are echoed as annotations: a run's raw logs are not
+      # reachable from every tool, and "exit code 1" alone says nothing.
+      - name: Run the application tests
+        working-directory: app
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest tests -q 2>&1 | tee pytest.log || {
+            ../scripts/annoter_echec.sh pytest.log
+            exit 1
+          }
+
+      - name: Build
+        working-directory: app
+        shell: bash
+        run: |
+          set -o pipefail
+          flet build ${{ matrix.cible }} --build-number ${{ github.run_number }} \
+            --no-rich-output --yes 2>&1 | tee build.log || {
+            ../scripts/annoter_echec.sh build.log
+            exit 1
+          }
+
+      # Un dossier de plusieurs centaines de fichiers ne s'installe pas : on
+      # en fait une archive unique, la seule chose qu'on puisse attacher a une
+      # release et telecharger d'un clic.
+      - name: Package the build
+        working-directory: app
+        shell: bash
+        run: |
+          set -eu
+          version="${{ steps.version.outputs.value }}"
+          mkdir -p dist
+          case "${{ matrix.cible }}" in
+            linux)
+              tar -czf "dist/ai-trader-$version-linux-x64.tar.gz" -C build/linux .
+              ;;
+            windows)
+              powershell -NoProfile -Command \
+                "Compress-Archive -Path 'build/windows/*' -DestinationPath 'dist/ai-trader-$version-windows-x64.zip'"
+              ;;
+          esac
+          ls -lh dist/
+
+      # Inno Setup est sur les images windows de GitHub, mais une image peut
+      # changer : son absence degrade la livraison (l'archive portable reste)
+      # au lieu de faire echouer le build.
+      - name: Build the Windows installer
+        if: matrix.cible == 'windows'
+        working-directory: app
+        shell: pwsh
+        run: |
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) {
+            $candidat = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+            if (Test-Path $candidat) { $iscc = $candidat }
+          }
+          if (-not $iscc) {
+            Write-Output "::warning::Inno Setup absent de cette image : seule l'archive portable est publiee."
+            exit 0
+          }
+          # Le .exe le plus proche de la racine du bundle est celui de
+          # l'application ; les autres sont des outils embarques par Flutter.
+          $exe = Get-ChildItem -Path build/windows -Filter *.exe -Recurse |
+                 Sort-Object { $_.FullName.Length } | Select-Object -First 1
+          if (-not $exe) { throw "aucun .exe dans build/windows" }
+          # Le script d'installation vit dans le depot : un here-string
+          # PowerShell colle ses lignes en colonne 0, ce qu'un bloc YAML
+          # n'accepte pas.
+          $gabarit = Get-Content ../.github/installateur.iss.in -Raw
+          $gabarit = $gabarit.
+            Replace("@VERSION@", "${{ steps.version.outputs.value }}").
+            Replace("@SOURCE@", $exe.Directory.FullName).
+            Replace("@EXE@", $exe.Name).
+            Replace("@SORTIE@", (Join-Path $PWD.Path "dist"))
+          Set-Content -Path installateur.iss -Value $gabarit -Encoding utf8BOM
+          & $iscc /Qp installateur.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC a echoue ($LASTEXITCODE)" }
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-trader-${{ matrix.cible }}-${{ steps.version.outputs.value }}
+          path: app/dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  publication:
+    name: Publish the GitHub release
+    needs: [apk, desktop]
+    # `needs` sur un job saute fait sauter celui-ci, sauf avec !cancelled() :
+    # construire la seule cible desktop doit pouvoir publier quand meme. Un
+    # echec, lui, n'est jamais publie.
+    if: >-
+      ${{ !cancelled()
+      && (github.event_name == 'push' || inputs.release_tag != '')
+      && needs.apk.result != 'failure'
+      && needs.desktop.result != 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: telechargements
+          merge-multiple: true
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          if [ "${{ github.event_name }}" = "push" ]; then
+            tag="${{ github.ref_name }}"
+          else
+            tag="${{ inputs.release_tag }}"
+          fi
+          ls -lh telechargements/
+
+          gh release create "$tag" \
+            --target "$GITHUB_SHA" \
+            --title "AI-Trader $tag" \
+            --notes-file .github/notes_publication_fr.md \
+            --prerelease \
+            telechargements/*

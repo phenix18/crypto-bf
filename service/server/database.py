@@ -21,9 +21,28 @@ except ImportError:  # pragma: no cover - dependency is optional until PostgreSQ
     dict_row = None
 
 
-_BASE_DIR = os.path.dirname(__file__)
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.abspath(os.path.join(_BASE_DIR, os.pardir, os.pardir))
 _DEFAULT_SQLITE_DB_PATH = os.path.join(_BASE_DIR, "data", "clawtrader.db")
-_SQLITE_DB_PATH = os.getenv("DB_PATH", _DEFAULT_SQLITE_DB_PATH)
+
+
+def _resolve_sqlite_path(raw: str) -> str:
+    """Resolve DB_PATH, anchoring relative paths at the project root.
+
+    The API has to be launched from service/server because the server modules
+    import each other flat, while DB_PATH in .env.example is written relative to
+    the repository root. Anchoring it here means one database file regardless of
+    the directory the process was started from.
+    """
+    if not raw:
+        return _DEFAULT_SQLITE_DB_PATH
+    expanded = os.path.expanduser(raw)
+    if os.path.isabs(expanded):
+        return expanded
+    return os.path.abspath(os.path.join(_PROJECT_ROOT, expanded))
+
+
+_SQLITE_DB_PATH = _resolve_sqlite_path(os.getenv("DB_PATH", "").strip())
 _POSTGRES_NOW_TEXT_SQL = (
     "to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', "
     "'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"')"

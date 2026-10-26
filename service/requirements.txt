@@ -2,6 +2,8 @@
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 pydantic>=2.5.3
+# EmailStr fields in routes_models.py fail to build a schema without this.
+email-validator>=2.0.0
 python-dotenv>=1.0.0
 web3>=6.15.1
 requests>=2.31.0
@@ -11,4 +13,6 @@ openrouter>=1.0.0
 psycopg[binary]>=3.2.1
 redis>=5.0.8
 pytest>=8.0.0
+# fastapi.testclient (used across service/server/tests) requires httpx.
+httpx>=0.27.0
 yfinance>=0.2.30

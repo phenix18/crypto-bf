@@ -1,0 +1,35 @@
+; Gabarit du programme d'installation Windows, rempli par le workflow
+; app-release.yml : @VERSION@, @SOURCE@ (le dossier produit par flet build),
+; @EXE@ (le nom de l'exécutable) et @SORTIE@ (où déposer le setup).
+;
+; PrivilegesRequired=lowest est voulu : l'application n'a besoin d'aucun droit
+; administrateur, et en demander un pour une préversion est le meilleur moyen
+; de ne jamais être installé.
+
+[Setup]
+AppName=AI-Trader
+AppVersion=@VERSION@
+AppPublisher=AI-Trader
+DefaultDirName={autopf}\AI-Trader
+DefaultGroupName=AI-Trader
+OutputDir=@SORTIE@
+OutputBaseFilename=ai-trader-@VERSION@-windows-setup
+Compression=lzma2
+SolidCompression=yes
+PrivilegesRequired=lowest
+WizardStyle=modern
+AppVerName=AI-Trader @VERSION@
+UninstallDisplayName=AI-Trader @VERSION@
+
+[Languages]
+Name: "fr"; MessagesFile: "compiler:Languages\French.isl"
+
+[Files]
+Source: "@SOURCE@\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
+
+[Icons]
+Name: "{group}\AI-Trader"; Filename: "{app}\@EXE@"
+Name: "{autodesktop}\AI-Trader"; Filename: "{app}\@EXE@"
+
+[Run]
+Filename: "{app}\@EXE@"; Description: "Lancer AI-Trader"; Flags: nowait postinstall skipifsilent

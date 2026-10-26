@@ -1,6 +1,19 @@
 // i18n translations for AI-Trader
 
-export type Language = 'zh' | 'en'
+export type Language = 'zh' | 'en' | 'fr'
+
+/** Every language the interface ships, in the order the switcher shows them. */
+export const LANGUAGES: readonly Language[] = ['zh', 'en', 'fr'] as const
+
+export const LANGUAGE_NAMES: Record<Language, string> = {
+  zh: '中文',
+  en: 'EN',
+  fr: 'FR',
+}
+
+/** Whether a stored or supplied value is a language we actually have. */
+export const isLanguage = (value: unknown): value is Language =>
+  typeof value === 'string' && (LANGUAGES as readonly string[]).includes(value)
 
 export interface Translations {
   // Navigation
@@ -304,6 +317,103 @@ export const translations: Record<Language, Translations> = {
       pleaseLogin: 'Please login first',
       operationFailed: 'Operation failed'
     }
+  },
+  fr: {
+    nav: {
+      signals: 'Place de marché',
+      strategies: 'Stratégies',
+      discussions: 'Discussions',
+      positions: 'Positions',
+      trade: 'Trader',
+      exchange: 'Échange',
+      create: 'Créer'
+    },
+    common: {
+      login: 'Connexion',
+      logout: 'Déconnexion',
+      connected: 'Connecté',
+      balance: 'Solde',
+      claw: 'CLAW',
+      points: 'points',
+      loading: 'Chargement…',
+      cancel: 'Annuler',
+      confirm: 'Confirmer',
+      submit: 'Envoyer',
+      close: 'Fermer',
+      back: 'Retour',
+      next: 'Suivant',
+      refresh: 'Actualiser'
+    },
+    signals: {
+      operations: 'Opérations',
+      noSignals: 'Aucun signal pour le moment',
+      publish: 'Publier'
+    },
+    strategies: {
+      title: 'Stratégies',
+      market: 'Marché',
+      noStrategies: 'Aucune stratégie pour le moment',
+      publish: 'Publier une stratégie',
+      publishSuccess: 'Stratégie publiée !',
+      submit: 'Publier',
+      content: 'Contenu de la stratégie',
+      symbols: 'Actifs concernés',
+      tags: 'Étiquettes'
+    },
+    discussions: {
+      title: 'Discussions',
+      market: 'Marché',
+      noDiscussions: 'Aucune discussion pour le moment',
+      post: 'Lancer une discussion',
+      postSuccess: 'Discussion publiée !',
+      submit: 'Publier',
+      content: 'Contenu de la discussion',
+      tags: 'Étiquettes'
+    },
+    positions: {
+      title: 'Mes positions',
+      noPositions: 'Aucune position'
+    },
+    trade: {
+      title: 'Passer un ordre',
+      market: 'Marché',
+      action: 'Sens',
+      symbol: 'Actif',
+      price: 'Prix',
+      quantity: 'Quantité',
+      content: 'Note',
+      executedAt: "Heure d'exécution",
+      submit: "Envoyer l'ordre",
+      success: 'Ordre passé !',
+      buy: 'Acheter',
+      sell: 'Vendre',
+      short: 'Vendre à découvert',
+      cover: 'Racheter'
+    },
+    exchange: {
+      title: 'Échange de points',
+      currentPoints: 'Points actuels',
+      currentCash: 'Liquidités',
+      exchangeRate: 'Taux : 1 point = 1 000 USD',
+      amount: 'Points à échanger',
+      submit: 'Échanger',
+      success: 'Échange effectué !',
+      insufficientPoints: 'Points insuffisants',
+      enterAmount: 'Saisissez un nombre de points'
+    },
+    login: {
+      title: 'Inscription / Connexion',
+      name: 'Nom',
+      email: 'E-mail',
+      register: "S'inscrire",
+      registering: 'Inscription…',
+      success: 'Connexion réussie !',
+      failed: 'Échec de la connexion'
+    },
+    errors: {
+      pleaseLogin: "Connectez-vous d'abord",
+      operationFailed: "L'opération a échoué"
+    }
   }
 }
 
@@ -327,5 +437,25 @@ export const categoryTranslations: Record<Language, Record<string, string>> = {
     'analysis': 'Analysis',
     'tool': 'Tool',
     'all': 'All Categories'
+  },
+  fr: {
+    'trading-signal': 'Signal de trading',
+    'data-feed': 'Flux de données',
+    'model-access': 'Accès au modèle',
+    'analysis': 'Analyse',
+    'tool': 'Outil',
+    'all': 'Toutes les catégories'
   }
 }
+
+/**
+ * One label in each language, for the strings that live inline in a component
+ * rather than in `translations`.
+ *
+ * It falls back to English rather than showing a key or an empty element: a
+ * missing translation should read as the wrong language, not as a broken
+ * screen. The test suite checks the tables here are complete, so the fallback
+ * is a safety net and not the normal path.
+ */
+export const pick = (language: Language, labels: Record<Language, string>): string =>
+  labels[language] ?? labels.en

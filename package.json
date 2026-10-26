@@ -1,4 +1,9 @@
 {
+  "name": "ai-trader",
+  "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "dependencies": {
     "recharts": "^3.8.0"
   }

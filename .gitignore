@@ -133,3 +133,28 @@ change.md
 
 # Local agent config symlink
 .codex
+
+# ====================
+# Local development
+# ====================
+.venv/
+/service/frontend/dist/
+/service/server/logs/
+
+# SQLite files, wherever DB_PATH happens to put them.
+*.db
+*.db-wal
+*.db-shm
+
+# ====================
+# PC/Android application
+# ====================
+/app/build/
+/app/.flet/
+
+# Signing keys. A release keystore in a repository is a published private key:
+# anyone holding it can ship an update that Android accepts as ours.
+*.jks
+*.keystore
+keystore.b64
+key.properties

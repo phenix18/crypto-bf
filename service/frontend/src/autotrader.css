@@ -1,0 +1,812 @@
+/*
+ * The auto-trading desk.
+ *
+ * It borrows the app's surfaces and accent so it does not look like a
+ * different product, and adds only what a trading screen needs: a long/short
+ * colour pair, raised controls that read as pressable, and a gauge whose
+ * colour agrees with the engine's own verdict.
+ *
+ * Two rules held throughout. Colour never carries meaning alone — every green
+ * or red also has a word next to it, because a trading screen is exactly where
+ * a colour-blind reader must not be guessing. And nothing animates on a price
+ * change: a flashing number is harder to read at the moment it matters most.
+ */
+
+.at-page {
+  --at-long: #16c784;
+  --at-short: #ea3943;
+  --at-neutral: #64748b;
+  --at-ink: #0b1120;
+  --at-gauge-from: #16c784;
+  --at-gauge-to: #38bdf8;
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 32px;
+
+  /*
+   * The breakpoints below measure this element, not the window. The app keeps
+   * a fixed sidebar and a trending rail either side, so the viewport width
+   * says very little about how much room this page actually has — on a narrow
+   * laptop the column here can be half what a @media rule would assume.
+   */
+  container-type: inline-size;
+}
+
+/* ---------------------------------------------------------------- header -- */
+
+.at-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.at-head h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: -0.01em;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.at-head p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.at-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.at-badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--border-color);
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+}
+
+.at-badge--safe {
+  border-color: rgba(22, 199, 132, 0.4);
+  color: var(--at-long);
+}
+
+.at-badge--live {
+  border-color: rgba(234, 57, 67, 0.55);
+  color: #fff;
+  background: linear-gradient(135deg, #b91c1c, #ea3943);
+}
+
+.at-badge--armed {
+  border-color: rgba(212, 164, 88, 0.5);
+  color: var(--accent-primary);
+}
+
+.at-badge--muted {
+  color: var(--text-muted);
+}
+
+.at-notice {
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.at-notice--warn {
+  border-color: rgba(217, 157, 76, 0.45);
+  color: var(--warning);
+}
+
+.at-notice--error {
+  border-color: rgba(239, 68, 68, 0.45);
+  color: var(--error);
+}
+
+/* -------------------------------------------------------------- controls -- */
+
+.at-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.at-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.at-chip {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.at-chip:hover {
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+.at-chip.is-active {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  box-shadow: inset 0 0 0 1px rgba(212, 164, 88, 0.25);
+}
+
+.at-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/*
+ * The raised controls. The depth is two shadows — a hard one underneath for
+ * the edge and a soft one for the drop — plus an inset highlight along the
+ * top. Pressing moves the button down by exactly the edge height, so the
+ * motion reads as the button meeting the surface rather than sliding on it.
+ */
+.at-btn {
+  --at-btn-face: #1b2733;
+  --at-btn-edge: #0a1017;
+  --at-btn-text: var(--text-primary);
+
+  position: relative;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--at-btn-text);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--at-btn-face) 88%, #fff) 0%, var(--at-btn-face) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 3px 0 var(--at-btn-edge),
+    0 8px 18px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.2s ease;
+}
+
+.at-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.at-btn:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 0 var(--at-btn-edge),
+    0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.at-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.at-btn:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+  opacity: 0.55;
+  transform: none;
+}
+
+.at-btn--go {
+  --at-btn-face: #0f9f6a;
+  --at-btn-edge: #065f43;
+  --at-btn-text: #f0fff8;
+}
+
+.at-btn--stop {
+  --at-btn-face: #b4303a;
+  --at-btn-edge: #6f161d;
+  --at-btn-text: #fff5f5;
+}
+
+.at-btn--warn {
+  --at-btn-face: #c08a33;
+  --at-btn-edge: #7a5313;
+  --at-btn-text: #1a1206;
+}
+
+.at-btn--ghost {
+  --at-btn-face: #243141;
+  --at-btn-edge: #0d141c;
+}
+
+.at-btn--tiny {
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  border-radius: 7px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 2px 0 var(--at-btn-edge);
+}
+
+.at-btn--tiny:active:not(:disabled) {
+  transform: translateY(2px);
+}
+
+/* ----------------------------------------------------------------- cards -- */
+
+.at-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2.1fr) minmax(300px, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.at-grid--bottom {
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+}
+
+.at-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.at-card--chart {
+  padding: 12px 12px 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The canvas takes whatever height the column has, so the chart grows with
+   the panel beside it instead of leaving a hole under itself. */
+.at-card--chart .at-canvas {
+  flex: 1;
+  min-height: 420px;
+}
+
+.at-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.at-card-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+}
+
+.at-card h3 {
+  margin: 14px 0 8px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.at-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* ----------------------------------------------------------------- chart -- */
+
+.at-canvas {
+  display: block;
+  width: 100%;
+  height: 520px;
+}
+
+.at-legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.68rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.at-key::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 2px;
+  margin-right: 5px;
+  vertical-align: middle;
+  background: currentColor;
+}
+
+.at-key--fast { color: #38bdf8; }
+.at-key--slow { color: #a78bfa; }
+.at-key--trend { color: #f59e0b; }
+.at-key--band { color: rgba(96, 165, 250, 0.8); }
+.at-key--stop { color: #ef4444; }
+.at-key--target { color: #22c55e; }
+
+.at-dir {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  border: 1px solid currentColor;
+}
+
+.at-dir--long { color: var(--at-long); }
+.at-dir--short { color: var(--at-short); }
+.at-dir--flat { color: var(--at-neutral); }
+
+/* ----------------------------------------------------------------- gauge -- */
+
+.at-gauge {
+  position: relative;
+  width: 100%;
+  max-width: 220px;
+  margin: 0 auto 8px;
+}
+
+.at-gauge svg {
+  width: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.at-gauge-track,
+.at-gauge-value {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.at-gauge-track {
+  stroke: rgba(148, 163, 184, 0.18);
+}
+
+.at-gauge-value {
+  stroke: url(#at-gauge-fill);
+  transition: stroke-dasharray 0.4s ease;
+}
+
+.at-gauge-gate {
+  stroke: var(--accent-primary);
+  stroke-width: 2;
+}
+
+.at-gauge--warn { --at-gauge-from: #d99d4c; --at-gauge-to: #f0c070; }
+.at-gauge--bad { --at-gauge-from: #9b2c33; --at-gauge-to: #ea3943; }
+
+.at-gauge-centre {
+  position: absolute;
+  inset: auto 0 2px;
+  text-align: center;
+}
+
+.at-gauge-centre strong {
+  display: block;
+  font-size: 1.7rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.at-gauge-centre span {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+/* ----------------------------------------------------------------- stats -- */
+
+.at-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 0;
+}
+
+.at-stats--wide {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.at-stats div {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.at-stats dt {
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.at-stats dd {
+  margin: 3px 0 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.at-up { color: var(--at-long); }
+.at-down { color: var(--at-short); }
+.at-muted { color: var(--text-muted); font-size: 0.8rem; }
+
+.at-stage {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.at-stage--executed,
+.at-stage--approved { color: var(--at-long); }
+.at-stage--risk,
+.at-stage--execution,
+.at-stage--error { color: var(--at-short); }
+.at-stage--strategy,
+.at-stage--calibration,
+.at-stage--council,
+.at-stage--bar,
+.at-stage--position { color: var(--warning); }
+
+.at-reasons {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.at-reasons li {
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  padding-left: 12px;
+  border-left: 2px solid var(--border-light);
+}
+
+/* --------------------------------------------------------------- council -- */
+
+.at-conviction {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.at-council {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.at-council li {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.at-council strong {
+  display: block;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+  color: var(--text-primary);
+}
+
+.at-council p {
+  margin: 2px 0;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.at-council small {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.at-stance {
+  text-align: center;
+  padding: 3px 0;
+  border-radius: var(--radius-sm);
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1px solid currentColor;
+}
+
+.at-stance--confirm { color: var(--at-long); }
+.at-stance--veto { color: var(--at-short); }
+.at-stance--abstain { color: var(--at-neutral); }
+
+/* ------------------------------------------------------------- positions -- */
+
+.at-positions {
+  margin-top: 4px;
+}
+
+.at-position {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  font-size: 0.74rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.at-position + .at-position {
+  margin-top: 8px;
+}
+
+.at-sl { color: var(--at-short); }
+.at-tp { color: var(--at-long); }
+
+/* ----------------------------------------------------------------- votes -- */
+
+.at-votes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.at-votes li {
+  display: grid;
+  grid-template-columns: 86px minmax(60px, 1fr);
+  grid-template-areas: 'name bar' 'detail detail';
+  gap: 4px 10px;
+  align-items: center;
+}
+
+.at-vote {
+  grid-area: name;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.at-vote--long { color: var(--at-long); }
+.at-vote--short { color: var(--at-short); }
+.at-vote--flat { color: var(--at-neutral); }
+
+.at-bar {
+  grid-area: bar;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  overflow: hidden;
+}
+
+.at-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--at-neutral);
+}
+
+.at-bar-fill--long { background: linear-gradient(90deg, #0e8f5f, var(--at-long)); }
+.at-bar-fill--short { background: linear-gradient(90deg, #8f2027, var(--at-short)); }
+
+.at-votes small {
+  grid-area: detail;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* -------------------------------------------------------------- readings -- */
+
+.at-readings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.at-readings div {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  min-width: 0;
+}
+
+.at-readings dt {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.at-readings dd {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* ----------------------------------------------------------------- audit -- */
+
+.at-audit {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.at-audit li {
+  display: grid;
+  grid-template-columns: 64px 76px 1fr;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 0.72rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-secondary);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.at-audit li small {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.at-audit-kind {
+  color: var(--accent-primary);
+}
+
+/* ----------------------------------------------------------------- light -- */
+
+:root[data-theme='light'] .at-page {
+  --at-ink: #fbfbfd;
+}
+
+:root[data-theme='light'] .at-btn {
+  --at-btn-face: #e8eaf0;
+  --at-btn-edge: #b9bfcc;
+  --at-btn-text: #1b2430;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 3px 0 var(--at-btn-edge),
+    0 8px 16px rgba(15, 23, 42, 0.14);
+}
+
+:root[data-theme='light'] .at-btn--go { --at-btn-face: #16a46f; --at-btn-edge: #0b6b47; --at-btn-text: #fff; }
+:root[data-theme='light'] .at-btn--stop { --at-btn-face: #cf3b45; --at-btn-edge: #8d1f27; --at-btn-text: #fff; }
+:root[data-theme='light'] .at-btn--warn { --at-btn-face: #d8a23f; --at-btn-edge: #8d6413; --at-btn-text: #1a1206; }
+:root[data-theme='light'] .at-btn--ghost { --at-btn-face: #dfe3ec; --at-btn-edge: #b2b9c6; }
+:root[data-theme='light'] .at-bar { background: rgba(71, 85, 105, 0.18); }
+
+/* --------------------------------------------------------------- narrow -- */
+
+@container (max-width: 1000px) {
+  .at-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .at-canvas,
+  .at-card--chart .at-canvas {
+    height: 420px;
+    min-height: 0;
+  }
+}
+
+@container (max-width: 560px) {
+  .at-canvas,
+  .at-card--chart .at-canvas {
+    height: 320px;
+  }
+
+  .at-actions {
+    width: 100%;
+  }
+
+  .at-actions .at-btn {
+    flex: 1;
+  }
+
+  /* Two columns of numbers in a 300px column is four characters per cell. */
+  .at-stats,
+  .at-stats--wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .at-council li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .at-stance {
+    justify-self: start;
+    padding: 3px 10px;
+  }
+
+  .at-votes li {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'name' 'bar' 'detail';
+  }
+
+  .at-readings {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  }
+
+  .at-audit li {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+/* Viewport fallback for browsers without container queries. */
+@supports not (container-type: inline-size) {
+  @media (max-width: 1100px) {
+    .at-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}
+
+/*
+ * Someone who has asked for less motion gets none: the gauge is the only
+ * animated thing here and it is decorative.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .at-gauge-value,
+  .at-btn,
+  .at-chip {
+    transition: none;
+  }
+}
