@@ -119,7 +119,8 @@ git tag app-v1.0.0 && git push origin app-v1.0.0   # construit tout
 ```
 
 ou l'onglet **Actions → Application build (PC and Android) → Run workflow**,
-qui demande la cible (`apk`, `desktop`, `all`) et un `versionCode`.
+qui demande la cible (`apk`, `desktop`, `all`), un `versionCode`, et un
+`release_tag`.
 
 Avant de construire, le workflow vérifie que la copie du moteur dans
 `app/src/engine/` est identique à `service/server/` et relance les tests de
@@ -134,6 +135,33 @@ workflow utilise `github.run_number`, qui augmente tout seul ; l'entrée
 `build_number` permet de le forcer.
 
 Le `versionName` affiché vient de `version` dans `app/pyproject.toml`.
+
+### Publier une release téléchargeable
+
+Laissé vide, `release_tag` ne produit que des artefacts d'Actions : visibles
+uniquement connecté au dépôt, et effacés au bout de 30 jours. Rempli — par
+exemple `app-v1.0.0` — le workflow crée en plus **une release GitHub** sur le
+commit construit, avec un lien de téléchargement direct par plateforme :
+
+| Fichier attaché | Pour qui |
+|---|---|
+| `ai-trader-<version>-windows-setup.exe` | Windows, installation en deux clics, sans droits administrateur |
+| `ai-trader-<version>-windows-x64.zip` | Windows, version portable |
+| `ai-trader-<version>-linux-x64.tar.gz` | Linux, GTK 3 requis |
+| `app-arm64-v8a-release.apk` | Android |
+
+C'est la release qui crée le tag, pas l'inverse : un `git push --tags` n'est
+pas nécessaire — et depuis certains environnements, il est refusé.
+
+Le texte de la release est [`.github/notes_publication_fr.md`](../.github/notes_publication_fr.md),
+le programme d'installation Windows est engendré depuis
+[`.github/installateur.iss.in`](../.github/installateur.iss.in). Les releases
+sortent en **préversion** tant que la recette sur appareil du §11 du document
+de conception n'est pas faite.
+
+> Inno Setup est présent sur les images Windows de GitHub, mais une image peut
+> changer. S'il manque, le build ne tombe pas : il émet un avertissement et la
+> release ne contient que l'archive portable.
 
 ---
 
@@ -158,7 +186,30 @@ Trois choses à regarder :
 
 ---
 
-## 6. Installer sur le téléphone
+## 6. Installer
+
+### Sur un PC
+
+Depuis la release GitHub :
+
+- **Windows** — `ai-trader-<version>-windows-setup.exe`, puis suivre
+  l'assistant. L'application s'installe dans le dossier de l'utilisateur, donc
+  sans élévation. Windows peut afficher un avertissement SmartScreen tant que
+  l'exécutable n'est pas signé par un certificat de confiance : « Informations
+  complémentaires » → « Exécuter quand même ».
+- **Windows, sans installer** — décompresser le `.zip` et lancer l'exécutable.
+- **Linux** — `tar xzf ai-trader-<version>-linux-x64.tar.gz`, puis lancer
+  l'exécutable. Il faut GTK 3 (`libgtk-3-0`), présent sur toute installation
+  de bureau récente.
+
+Depuis les sources, sans rien télécharger :
+
+```bash
+pip install 'flet[cli]==0.86.5'
+make app-run
+```
+
+### Sur le téléphone
 
 ```bash
 adb install -r app-arm64-v8a-release.apk

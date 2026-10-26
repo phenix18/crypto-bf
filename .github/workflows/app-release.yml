@@ -19,6 +19,10 @@ on:
         default: "apk"
         type: choice
         options: ["apk", "desktop", "all"]
+      release_tag:
+        description: "Tag to publish a GitHub release under (empty = artifacts only)"
+        required: false
+        default: ""
   push:
     tags: ["app-v*"]
 
@@ -190,6 +194,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ninja-build libgtk-3-dev clang cmake pkg-config
 
+      - name: Read the version
+        id: version
+        shell: bash
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import re, pathlib
+          texte = pathlib.Path("app/pyproject.toml").read_text(encoding="utf-8")
+          print("value=" + re.search(r'^version\s*=\s*"([^"]+)"', texte, re.M).group(1))
+          PY
+
       # pytest too: this job has no requirements.txt behind it, so nothing
       # else brings it in and the test step would fail before the build.
       - name: Install Flet and pytest
@@ -221,9 +235,107 @@ jobs:
             exit 1
           }
 
+      # Un dossier de plusieurs centaines de fichiers ne s'installe pas : on
+      # en fait une archive unique, la seule chose qu'on puisse attacher a une
+      # release et telecharger d'un clic.
+      - name: Package the build
+        working-directory: app
+        shell: bash
+        run: |
+          set -eu
+          version="${{ steps.version.outputs.value }}"
+          mkdir -p dist
+          case "${{ matrix.cible }}" in
+            linux)
+              tar -czf "dist/ai-trader-$version-linux-x64.tar.gz" -C build/linux .
+              ;;
+            windows)
+              powershell -NoProfile -Command \
+                "Compress-Archive -Path 'build/windows/*' -DestinationPath 'dist/ai-trader-$version-windows-x64.zip'"
+              ;;
+          esac
+          ls -lh dist/
+
+      # Inno Setup est sur les images windows de GitHub, mais une image peut
+      # changer : son absence degrade la livraison (l'archive portable reste)
+      # au lieu de faire echouer le build.
+      - name: Build the Windows installer
+        if: matrix.cible == 'windows'
+        working-directory: app
+        shell: pwsh
+        run: |
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) {
+            $candidat = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+            if (Test-Path $candidat) { $iscc = $candidat }
+          }
+          if (-not $iscc) {
+            Write-Output "::warning::Inno Setup absent de cette image : seule l'archive portable est publiee."
+            exit 0
+          }
+          # Le .exe le plus proche de la racine du bundle est celui de
+          # l'application ; les autres sont des outils embarques par Flutter.
+          $exe = Get-ChildItem -Path build/windows -Filter *.exe -Recurse |
+                 Sort-Object { $_.FullName.Length } | Select-Object -First 1
+          if (-not $exe) { throw "aucun .exe dans build/windows" }
+          # Le script d'installation vit dans le depot : un here-string
+          # PowerShell colle ses lignes en colonne 0, ce qu'un bloc YAML
+          # n'accepte pas.
+          $gabarit = Get-Content ../.github/installateur.iss.in -Raw
+          $gabarit = $gabarit.
+            Replace("@VERSION@", "${{ steps.version.outputs.value }}").
+            Replace("@SOURCE@", $exe.Directory.FullName).
+            Replace("@EXE@", $exe.Name).
+            Replace("@SORTIE@", (Join-Path $PWD.Path "dist"))
+          Set-Content -Path installateur.iss -Value $gabarit -Encoding utf8BOM
+          & $iscc /Qp installateur.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC a echoue ($LASTEXITCODE)" }
+          Get-ChildItem dist | Format-Table Name, Length
+
       - uses: actions/upload-artifact@v4
         with:
-          name: ai-trader-${{ matrix.cible }}
-          path: app/build/${{ matrix.cible }}/**
+          name: ai-trader-${{ matrix.cible }}-${{ steps.version.outputs.value }}
+          path: app/dist/*
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
+
+  publication:
+    name: Publish the GitHub release
+    needs: [apk, desktop]
+    # `needs` sur un job saute fait sauter celui-ci, sauf avec !cancelled() :
+    # construire la seule cible desktop doit pouvoir publier quand meme. Un
+    # echec, lui, n'est jamais publie.
+    if: >-
+      ${{ !cancelled()
+      && (github.event_name == 'push' || inputs.release_tag != '')
+      && needs.apk.result != 'failure'
+      && needs.desktop.result != 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: telechargements
+          merge-multiple: true
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          if [ "${{ github.event_name }}" = "push" ]; then
+            tag="${{ github.ref_name }}"
+          else
+            tag="${{ inputs.release_tag }}"
+          fi
+          ls -lh telechargements/
+
+          gh release create "$tag" \
+            --target "$GITHUB_SHA" \
+            --title "AI-Trader $tag" \
+            --notes-file .github/notes_publication_fr.md \
+            --prerelease \
+            telechargements/*

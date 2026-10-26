@@ -42,6 +42,17 @@ l'application pilote en mode *relié* : état, verdicts, coupe-circuit. En mode
 Le coupe-circuit s'engage sans question et se relâche avec une confirmation :
 un arrêt d'urgence qui pose une question n'est pas un arrêt d'urgence.
 
+## Installer
+
+Les binaires sont publiés en release GitHub : `…-windows-setup.exe` (deux
+clics, sans droits administrateur), `…-windows-x64.zip` et
+`…-linux-x64.tar.gz` pour le PC, `…-release.apk` pour Android. Le détail, et
+ce que Windows raconte à propos d'un exécutable non signé, est dans
+[`docs/APP_BUILD_FR.md`](../docs/APP_BUILD_FR.md) §6.
+
+Depuis les sources, sans rien télécharger : `pip install 'flet[cli]==0.86.5'`
+puis `make app-run` à la racine du dépôt.
+
 ## Développement
 
 ```bash
